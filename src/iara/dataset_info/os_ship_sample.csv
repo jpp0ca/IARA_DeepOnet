@@ -1,0 +1,141 @@
+﻿IARA ID,Dataset,Ship ID,SHIPTYPE,TYPE,DETAILED TYPE,Name,CPA time,Rain,Temperature,Wind,Sea state,Rain state
+2,A,2,50,Special Craft,Pilot Vessel,PILOT 10,150,0,26.1,8.1,4,No rain
+5,A,5,50,Special Craft,Pilot Vessel,PILOT 09,150,0,23.3,3.6,2,No rain
+6,A,6,50,Special Craft,Pilot Vessel,PILOT 20,150,0,29.3,5.8,3,No rain
+7,A,6,50,Special Craft,Pilot Vessel,PILOT 20,71,0,27.1,5.7,3,No rain
+10,A,9,70,Cargo,Bulk Carrier,GDYNIA,150,0,33.1,5.6,3,No rain
+12,A,11,70,Cargo,Bulk Carrier,THREE SASKIAS,150,0,26.7,2.9,2,No rain
+13,A,12,70,Cargo,Container Ship,MSC SILVIA,150,0,25.2,7.7,4,No rain
+14,A,13,70,Cargo,Bulk Carrier,IVORY GULL,150,0,25.8,10,5,No rain
+15,A,14,70,Cargo,Bulk Carrier,FEDRA.GR,150,0,25.3,2,1,No rain
+16,A,15,70,Cargo,Bulk Carrier,LABRADOR,150,0,26,4.9,3,No rain
+17,A,16,50,Special Craft,Pilot Vessel,PILOT 08,150,0,24,2,1,No rain
+27,A,21,30,Fishing,Fishing Vessel,REI DA GLORIA G,150,0,19.2,7.3,4,No rain
+28,A,22,80,Tanker,Crude Oil Tanker,EAGLE SAN ANTONIO,70,0.4,18.3,3.5,2,Light
+37,A,25,70,Cargo,Container Ship,LOG IN POLARIS,150,0,22.5,3.6,2,No rain
+38,A,26,31,Tug,Tug,TS INCRIVEL,130,0,17,5.1,3,No rain
+42,A,29,30,Fishing,Fishing Vessel,AURITA,150,0,24.3,17.2,6,No rain
+43,A,30,70,Cargo,Container Ship,GSL MELINA,150,0,21.6,13.6,6,No rain
+45,A,26,31,Tug,Tug,TS INCRIVEL,150,0,23.9,3.9,2,No rain
+46,A,31,70,Cargo,Container Ship,MERCOSUL ITAJAI,150,0,20.7,7.2,4,No rain
+47,A,32,31,Tug,Tug,TS SOBERANO,150,0,21.6,7.1,4,No rain
+48,A,26,31,Tug,Tug,TS INCRIVEL,150,0,20.4,5.5,3,No rain
+61,A,38,70,Cargo,Container Ship,ANTHEA Y,150,0,22.7,1.8,1,No rain
+73,A,50,80,Tanker,Crude Oil Tanker,MARCILIO DIAS,150,0,20.2,4,2,No rain
+107,A,68,31,Tug,Tug,ENCO,100,0,29.5,6.1,3,No rain
+147,A,95,80,Tanker,Crude Oil Tanker,SKS DOURO,127,0,24.8,5.2,3,No rain
+159,A,95,80,Tanker,Crude Oil Tanker,SKS DOURO,150,0,26.5,3.4,2,No rain
+186,A,128,80,Tanker,Crude Oil Tanker,OLAVO BILAC,150,0,20.3,1.8,1,No rain
+199,A,138,30,Fishing,Fishing Vessel,NESTRE OANNES,150,0,24,4.6,3,No rain
+268,A,183,59,Special Craft,Motor Hopper,HANG BO 2003,150,0,25,4.9,3,No rain
+279,A,183,59,Special Craft,Motor Hopper,HANG BO 2003,96,0,24.1,2.6,2,No rain
+286,A,197,59,Special Craft,Motor Hopper,HANG BO 2002,118,0,24,10.3,5,No rain
+289,A,183,59,Special Craft,Motor Hopper,HANG BO 2003,138,0,27.9,5.1,3,No rain
+290,A,183,59,Special Craft,Motor Hopper,HANG BO 2003,75,0,29,3.8,2,No rain
+292,A,199,30,Fishing,Fishing Vessel,VO NICACIO,81,0,23.9,9.3,4,No rain
+331,A,199,30,Fishing,Fishing Vessel,VO NICACIO,81,0,23.9,9.3,4,No rain
+457,B,2,50,Special Craft,Pilot Vessel,PILOT 10, - ,0,21.8,5.4,3,No rain
+458,B,63,50,Special Craft,Pilot Vessel,PILOT 11, - ,0,24.6,6.2,3,No rain
+460,B,63,50,Special Craft,Pilot Vessel,PILOT 11, - ,0,28.9,3,2,No rain
+461,B,2,50,Special Craft,Pilot Vessel,PILOT 10, - ,0,23.2,5.7,3,No rain
+462,B,249,31,Tug,Tug,TS MARRENTO, - ,0,29.8,6,3,No rain
+464,B,251,31,Tug,Tug,PALMAS II, - ,0,27.6,6.2,3,No rain
+465,B,2,50,Special Craft,Pilot Vessel,PILOT 10, - ,0,26.1,3,2,No rain
+469,B,252,70,Cargo,Container Ship,BSG BARBADOS, - ,0,29.7,3.8,2,No rain
+471,B,254,80,Tanker,Crude Oil Tanker,SCORPIO, - ,0,23.2,5.9,3,No rain
+473,B,255,70,Cargo,Bulk Carrier,HAMGAM, - ,0,20.7,4,2,No rain
+475,B,255,70,Cargo,Bulk Carrier,HAMGAM, - ,0,20.7,4,2,No rain
+485,B,68,31,Tug,Tug,ENCO, - ,0,23.2,8.2,4,No rain
+487,B,260,70,Cargo,Container Ship,MSC AGADIR, - ,0,27.7,3.1,2,No rain
+492,B,262,70,Cargo,Bulk Carrier,SELIN M, - ,0,21.2,7.8,4,No rain
+494,B,263,70,Cargo,Bulk Carrier,STELLAR ALAZANI, - ,0,22.3,3.6,2,No rain
+497,B,164,70,Cargo,Container Ship,LOG IN PANTANAL, - ,0,23.6,3.8,2,No rain
+498,B,68,31,Tug,Tug,ENCO, - ,0,26,6.7,3,No rain
+500,B,266,30,Fishing,Fishing Vessel,CHARMOSO, - ,0,20.5,1.9,1,No rain
+502,B,262,70,Cargo,Bulk Carrier,SELIN M, - ,0,26.6,5.6,3,No rain
+508,B,269,80,Tanker,Crude Oil Tanker,LOS ANGELES SPIRIT, - ,0,26.9,7.1,4,No rain
+519,B,276,31,Tug,Tug,SEA MOBY DICK, - ,0,19.3,12,5,No rain
+567,B,282,70,Cargo,Container Ship,CMA CGM RIGOLETTO, - ,0,29.2,6.4,3,No rain
+568,B,183,59,Special Craft,Motor Hopper,HANG BO 2003, - ,0,26.8,7.3,4,No rain
+570,B,183,59,Special Craft,Motor Hopper,HANG BO 2003, - ,0.2,23,3.7,2,Light
+571,B,197,59,Special Craft,Motor Hopper,HANG BO 2002, - ,0,25.4,5.9,3,No rain
+574,B,183,59,Special Craft,Motor Hopper,HANG BO 2003, - ,0,22.8,3.8,2,No rain
+578,B,287,80,Tanker,Crude Oil Tanker,ANNA A / CAPE BAXLEY, - ,0.2,24.6,6.6,3,Light
+582,B,197,59,Special Craft,Motor Hopper,HANG BO 2002, - ,0,22.1,3.3,2,No rain
+593,B,287,80,Tanker,Crude Oil Tanker,ANNA A / CAPE BAXLEY, - ,0.2,24.6,6.6,3,Light
+609,B,290,70,Cargo,Container Ship,CARDIFF, - ,0,23.1,3.7,2,No rain
+636,B,297,80,Tanker,Crude Oil Tanker,CAP VICTOR, - ,0,22.4,2.4,1,No rain
+655,B,306,30,Fishing,Fishing Vessel,RED BOAT RJ 05, - ,0,28.2,5.4,3,No rain
+658,C,309,80,Tanker,Crude Oil Tanker,HENRIQUE DIAS,150,0,21.9,0.4,1,No rain
+659,C,310,80,Tanker,Crude Oil Tanker,STI FULHAM,150,0,21.8,10.7,5,No rain
+660,C,2,50,Special Craft,Pilot Vessel,PILOT 10,150,0,21.3,6.8,3,No rain
+661,C,311,70,Cargo,Bulk Carrier,ULTRA TIGER,150, - , - , - ,7,Very Heavy
+662,C,312,70,Cargo,Bulk Carrier,CAPE XL,150,0,19.3,2.5,1,No rain
+663,C,198,70,Cargo,Bulk Carrier,JOLANDA,122,0,22.1,3.8,2,No rain
+664,C,311,70,Cargo,Bulk Carrier,ULTRA TIGER,150, - , - , - ,7,Very Heavy
+665,C,313,70,Cargo,Bulk Carrier,SM DRAGON,150,0,20.2,3.5,2,No rain
+666,C,314,70,Cargo,Container Ship,FERNAO DE MAGALHAES,150,0,20.4,1.7,1,No rain
+668,C,50,80,Tanker,Crude Oil Tanker,MARCILIO DIAS,150,0,18.1,2.7,2,No rain
+673,C,319,70,Cargo,Container Ship,MAERSK LINS,150,0,22.9,3.1,2,No rain
+678,C,64,70,Cargo,Container Ship,SAN FERNANDO,150,0,24.2,2.2,1,No rain
+686,C,325,31,Tug,Tug,TS INVOCADO,150,0,19.1,10.9,5,No rain
+690,C,164,70,Cargo,Container Ship,LOG IN PANTANAL,150,0,23,3.4,2,No rain
+691,C,63,50,Special Craft,Pilot Vessel,PILOT 11,150,0,22.5,1.7,1,No rain
+692,C,68,31,Tug,Tug,ENCO,150,0,21.7,10.4,5,No rain
+693,C,68,31,Tug,Tug,ENCO,121,0,21.3,3.7,2,No rain
+694,C,144,70,Cargo,Container Ship,CMA CGM LITANI,150,0,19.2,2.3,1,No rain
+698,C,86,31,Tug,Tug,TS EXIBIDO,150,0.6,18.6,13,6,Light
+699,C,63,50,Special Craft,Pilot Vessel,PILOT 11,150,0.4,22.6,2.4,1,Light
+700,C,187,80,Tanker,Crude Oil Tanker,NS CREATION,150,0,21.4,3.7,2,No rain
+701,C,68,31,Tug,Tug,ENCO,121,0,21.4,3.7,2,No rain
+704,C,18,50,Special Craft,Pilot Vessel,PILOT 14,150,0,22,7.8,4,No rain
+708,C,18,50,Special Craft,Pilot Vessel,PILOT 14,150,0,22.5,4.3,2,No rain
+713,C,334,80,Tanker,Crude Oil Tanker,MARAN HERMES,150,0,21.9,1.8,1,No rain
+738,C,220,30,Fishing,Fishing Vessel,TEMPERANCA,150,0,22.2,4.8,3,No rain
+773,C,366,30,Fishing,Fishing Vessel,HELLAS TUNA,150,0,24.5,3.3,2,No rain
+796,C,373,30,Fishing,Fishing Vessel,ESTRELA DE KALY I,150,0,25.7,3.7,2,No rain
+821,C,183,59,Special Craft,Motor Hopper,HANG BO 2003,117,0,24.3,8.7,4,No rain
+824,C,197,59,Special Craft,Motor Hopper,HANG BO 2002,150,0,31.1,6.4,3,No rain
+825,C,183,59,Special Craft,Motor Hopper,HANG BO 2003,150,0,25.6,2.8,2,No rain
+826,C,197,59,Special Craft,Motor Hopper,HANG BO 2002,150,0,25.2,4.4,2,No rain
+828,C,384,30,Fishing,Fishing Vessel,PACHECO 0,150,0,24.7,5,3,No rain
+843,C,183,59,Special Craft,Motor Hopper,HANG BO 2003,117,0,24.3,8.7,4,No rain
+852,C,384,30,Fishing,Fishing Vessel,PACHECO 0,150,0,24.7,5,3,No rain
+997,D,2,50,Special Craft,Pilot Vessel,PILOT 10, - ,0,27.6,2.7,2,No rain
+998,D,451,70,Cargo,Container Ship,GSL VIOLETTA, - ,0,26.6,5.7,3,No rain
+999,D,452,70,Cargo,Container Ship,HUTTON / VILANO, - ,0,24.7,6,3,No rain
+1002,D,453,70,Cargo,Bulk Carrier,NEW LOTUS, - ,0,23.4,8.1,4,No rain
+1003,D,2,50,Special Craft,Pilot Vessel,PILOT 10, - ,0,24.8,9.2,4,No rain
+1005,D,2,50,Special Craft,Pilot Vessel,PILOT 10, - ,0,24.1,11.8,5,No rain
+1008,D,198,70,Cargo,Bulk Carrier,JOLANDA, - ,0,19.3,3.9,2,No rain
+1009,D,454,70,Cargo,Bulk Carrier,CAPE PYLOS, - ,0,21.1,1.5,1,No rain
+1010,D,455,30,Fishing,Fishing Vessel,PILOTS IV, - ,0,19.6,6.7,3,No rain
+1011,D,2,50,Special Craft,Pilot Vessel,PILOT 10, - ,0,23.3,5.1,3,No rain
+1015,D,456,70,Cargo,Bulk Carrier,GLOBE CLEOPATRA, - ,0,24.4,8.5,4,No rain
+1019,D,457,70,Cargo,Container Ship,CAPE SOUNIO, - ,0,26.4,5.8,3,No rain
+1020,D,458,70,Cargo,Container Ship,ISTANBUL EXPRESS, - ,0,28.3,3.9,2,No rain
+1024,D,2,50,Special Craft,Pilot Vessel,PILOT 10, - ,0,30.6,6.4,3,No rain
+1025,D,461,31,Tug,Tug,SAAM CARIPUNA, - ,0,30.4,3,2,No rain
+1036,D,466,70,Cargo,Bulk Carrier,SERENE SKY, - ,0,21.9,1.8,1,No rain
+1038,D,68,31,Tug,Tug,ENCO, - ,0,24.4,3.1,2,No rain
+1039,D,467,80,Tanker,Crude Oil Tanker,JOSE DO PATROCINIO, - ,1.8,20,13.7,6,Moderate
+1041,D,86,31,Tug,Tug,TS EXIBIDO, - ,0,19.8,1.6,1,No rain
+1043,D,68,31,Tug,Tug,ENCO, - ,0,24.4,3.1,2,No rain
+1044,D,467,80,Tanker,Crude Oil Tanker,JOSE DO PATROCINIO, - ,1.8,20,13.7,6,Moderate
+1046,D,86,31,Tug,Tug,TS EXIBIDO, - ,0,19.8,1.6,1,No rain
+1055,D,164,70,Cargo,Container Ship,LOG IN PANTANAL, - ,0,23.2,4.6,3,No rain
+1062,D,475,30,Fishing,Fishing Vessel,CALAMAI II, - ,0,24.1,4.3,2,No rain
+1069,D,476,80,Tanker,Crude Oil Tanker,ABDIAS NASCIMENTO, - ,0,21.9,1.8,1,No rain
+1106,D,487,30,Fishing,Fishing Vessel,POLYANNA I, - ,0,29.3,5.5,3,No rain
+1108,D,489,80,Tanker,Crude Oil Tanker,IZUMO PRINCESS, - ,0,28,3.3,2,No rain
+1109,D,489,80,Tanker,Crude Oil Tanker,IZUMO PRINCESS, - ,0,28.3,4.4,2,No rain
+1119,D,497,30,Fishing,Fishing Vessel,SANDSHAVID, - ,0,22.5,4.5,3,No rain
+1189,D,520,30,Fishing,Fishing Vessel,MENINO DO RIO I, - ,0,24.1,3.1,2,No rain
+1208,D,520,30,Fishing,Fishing Vessel,MENINO DO RIO I, - ,0,24.1,3.1,2,No rain
+1215,D,29,30,Fishing,Fishing Vessel,AURITA, - ,0,26,6.2,3,No rain
+1228,D,525,30,Fishing,Fishing Vessel,PILOT BOAT V, - ,0,21.2,0.9,1,No rain
+1232,D,197,59,Special Craft,Motor Hopper,HANG BO 2002, - ,0,28.5,5.6,3,No rain
+1233,D,183,59,Special Craft,Motor Hopper,HANG BO 2003, - ,0,28.7,7.6,4,No rain
+1234,D,197,59,Special Craft,Motor Hopper,HANG BO 2002, - ,0,24.5,2.6,2,No rain
+1237,D,197,59,Special Craft,Motor Hopper,HANG BO 2002, - ,0,25.2,5.9,3,No rain
+1244,D,183,59,Special Craft,Motor Hopper,HANG BO 2003, - ,0,24,5,3,No rain
