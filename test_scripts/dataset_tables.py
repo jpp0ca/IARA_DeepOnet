@@ -1,7 +1,9 @@
-"""Dataset Info Tables Test Program
+"""
+Dataset Info Tables Test Program
 
 This script generates tables describing compiled information.
-In the future, this test should lead to an application that generates .tex tables to be used in the dataset publication article.
+In the future, this test should lead to an application that generates .tex tables
+    to be used in the dataset publication article.
 """
 import pandas as pd
 import iara.description
@@ -12,7 +14,7 @@ def main(show_sample_dataset = False):
 
     os_ship_merged = []
     for sub in iara.description.Subdataset:
-        if sub.value > iara.description.Subdataset.os_ship.value:
+        if sub.value > iara.description.Subdataset.OS_SHIP.value:
             continue
 
         df = sub.to_dataframe(only_sample=show_sample_dataset)
@@ -21,7 +23,8 @@ def main(show_sample_dataset = False):
         if not isinstance(os_ship_merged, pd.DataFrame):
             os_ship_merged = part
         else:
-            os_ship_merged = pd.merge(os_ship_merged, part, on=['TYPE','DETAILED TYPE'], how='outer')
+            os_ship_merged = pd.merge(os_ship_merged, part,
+                                      on=['TYPE','DETAILED TYPE'],how='outer')
 
     os_ship_merged = os_ship_merged.fillna(0)
     os_ship_merged = os_ship_merged.sort_values(['TYPE','DETAILED TYPE'])
@@ -31,7 +34,7 @@ def main(show_sample_dataset = False):
 
 
     os_bg = iara.description.Subdataset.E.to_dataframe(only_sample=show_sample_dataset)
-    os_bg_merged = os_bg.groupby(['Rain state', 'Sea state']).size().reset_index(name=str(sub))
+    os_bg_merged = os_bg.groupby(['Rain state', 'Sea state']).size().reset_index(name='Qtd')
 
     order = {str(rain_enum): rain_enum.value for rain_enum in iara.description.Rain}
     os_bg_merged['Order'] = os_bg_merged['Rain state'].map(order)
@@ -40,6 +43,5 @@ def main(show_sample_dataset = False):
     print('\n------------------------- os_bg_merged -----------------------------------------')
     print(os_bg_merged)
 
-    
 if __name__ == "__main__":
     main()

@@ -1,10 +1,7 @@
-"""IARA description Module
+"""
+IARA description Module
 
 This module provides functionality to acess the parts of the IARA dataset.
-
-This module defines the Enums that representing different sources of background noise:
-- Rain: Enum for rain noise with various intensity levels.
-- Sea: Enum for sea state noise with different states.
 """
 import enum
 import os
@@ -20,7 +17,7 @@ class Rain(enum.Enum):
     VERY_HEAVY = 4 #(<100 mm/h)
 
     def __str__(self) -> str:
-        return str(self.name).split('.')[-1].capitalize().replace("_", " ")
+        return str(self.name).rsplit(".", maxsplit=1)[-1].capitalize().replace("_", " ")
 
     @staticmethod
     def classify(values: np.array) -> np.array:
@@ -38,7 +35,7 @@ class Rain(enum.Enum):
             Rain.VERY_HEAVY
         )
 
-class Sea_state(enum.Enum):
+class SeaState(enum.Enum):
     """Enum representing sea state noise with different states."""  
     _0 = 0 # Wind < 0.75 m/s
     _1 = 1 # Wind < 2.5 m/s
@@ -48,7 +45,7 @@ class Sea_state(enum.Enum):
     _5 = 5 # Wind < 12.6 m/s
     _6 = 6 # Wind < 19.3 m/s
     _7 = 7 # Wind < 26.5 m/s
- 
+
     def __str__(self) -> str:
         return str(self.value)
 
@@ -63,61 +60,67 @@ class Sea_state(enum.Enum):
             np.array: Vector of data classified according to the enum.
         """
         return np.select(
-            [values < 0.75, values < 2.5, values < 4.4, values < 6.9, values < 9.8, values < 12.6, values < 19.3],
-            [Sea_state._0, Sea_state._1, Sea_state._2, Sea_state._3, Sea_state._4, Sea_state._5, Sea_state._6],
-            Sea_state._7
+            [values < 0.75, values < 2.5, values < 4.4, values < 6.9, values < 9.8,
+                values < 12.6, values < 19.3],
+            [SeaState._0, SeaState._1, SeaState._2, SeaState._3, SeaState._4,
+                SeaState._5, SeaState._6],
+            SeaState._7
         )
 
 class Subdataset(enum.Enum):
     """Enum representing the different sub-datasets of IARA."""  
     A = 0
-    os_near_with_cpa = 0
+    OS_NEAR_CPA_IN = 0
     B = 1
-    os_near_without_cpa = 1
+    OS_NEAR_CPA_OUT = 1
     C = 2
-    os_far_with_cpa = 2
+    OS_FAR_CPA_IN = 2
     D = 3
-    os_far_without_cpa = 3
-    os_with_cpa = 4
-    os_without_cpa = 5
-    os_ship = 6
+    OS_FAR_CPA_OUT = 3
+    OS_CPA_IN = 4
+    OS_CPA_OUT = 5
+    OS_SHIP = 6
 
     E = 7
-    os_background = 7
+    OS_BG = 7
 
     def __get_info_filename(self, only_sample: bool = False) -> str:
+        if self.value <= Subdataset.OS_SHIP.value:
+            return os.path.join(os.path.dirname(__file__), "dataset_info",
+                                "os_ship.csv" if not only_sample else "os_ship_sample.csv")
 
-        if (self.value <= Subdataset.os_ship.value):
-            return os.path.join(os.path.dirname(__file__), "dataset_info", "os_ship.csv" if not only_sample else "os_ship_sample.csv")
-
-        if (self.value == Subdataset.E.value):
-            return os.path.join(os.path.dirname(__file__), "dataset_info", "os_bg.csv" if not only_sample else "os_bg_sample.csv")
+        if self.value == Subdataset.E.value:
+            return os.path.join(os.path.dirname(__file__), "dataset_info",
+                                "os_bg.csv" if not only_sample else "os_bg_sample.csv")
 
         raise UnboundLocalError('info filename not specified')
 
-    def __get_selection_str(self) -> str:
-        if (self == Subdataset.os_with_cpa):
-            return Subdataset.A.__get_selection_str() + "|" + Subdataset.C.__get_selection_str()
+    def get_selection_str(self) -> str:
+        """get string to filter the 'Dataset' column
+        """
+        if self == Subdataset.OS_CPA_IN:
+            return Subdataset.A.get_selection_str() + "|" + Subdataset.C.get_selection_str()
 
-        if (self == Subdataset.os_without_cpa):
-            return Subdataset.B.__get_selection_str() + "|" + Subdataset.D.__get_selection_str()
+        if self == Subdataset.OS_CPA_OUT:
+            return Subdataset.B.get_selection_str() + "|" + Subdataset.D.get_selection_str()
 
-        if (self == Subdataset.os_ship):
-            return Subdataset.A.__get_selection_str() + "|" + Subdataset.B.__get_selection_str() + "|" + Subdataset.C.__get_selection_str() + "|" + Subdataset.D.__get_selection_str()
+        if self == Subdataset.OS_SHIP:
+            return Subdataset.A.get_selection_str() + "|" + Subdataset.B.get_selection_str() + \
+                "|" + Subdataset.C.get_selection_str() + "|" + Subdataset.D.get_selection_str()
 
-        return str(self.name).split('.')[-1]
+        return str(self.name).rsplit(".", maxsplit=1)[-1]
 
     def __str__(self) -> str:
-        if (self == Subdataset.os_with_cpa):
+        if self == Subdataset.OS_CPA_IN:
             return 'with CPA'
 
-        if (self == Subdataset.os_without_cpa):
+        if self == Subdataset.OS_CPA_OUT:
             return 'without CPA'
 
-        if (self == Subdataset.os_ship):
+        if self == Subdataset.OS_SHIP:
             return 'Total'
 
-        return str(self.name).split('.')[-1]
+        return str(self.name).rsplit(".", maxsplit=1)[-1]
 
     def to_dataframe(self, only_sample: bool = False) -> pd.DataFrame:
         """Get information about the sub-dataset
@@ -130,4 +133,4 @@ class Subdataset(enum.Enum):
             pd.DataFrame: A DataFrame containing detailed information about the sub-dataset.
         """
         df = pd.read_csv(self.__get_info_filename(only_sample=only_sample))
-        return df.loc[df['Dataset'].str.contains(self.__get_selection_str())]
+        return df.loc[df['Dataset'].str.contains(self.get_selection_str())]

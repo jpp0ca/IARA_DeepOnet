@@ -16,6 +16,8 @@ This project aims to disseminate acoustic data through the implementation of sci
 
 Detailed instructions on how to install project dependencies are available in the README.
 
+pip install -e . --user
+
 ## Usage
 
 Explore the README to learn how to use the code and run experiments.
