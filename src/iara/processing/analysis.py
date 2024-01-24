@@ -141,7 +141,7 @@ def tpsw(data: np.array, n_pts: int = None, n: int = None, p: int = None,
     return mx
 
 def spectrogram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0,
-        decimation_rate: int = 1) -> typing.Tuple[np.array, np.array, np.array]:
+        decimation_rate: int = 1, **kwargs) -> typing.Tuple[np.array, np.array, np.array]:
     """Perform spectrogram data analysis
 
         Args:
@@ -184,7 +184,7 @@ def spectrogram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0,
     return power, freq, time
 
 def log_spectrogram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0,
-        decimation_rate: int = 1) -> typing.Tuple[np.array, np.array, np.array]:
+        decimation_rate: int = 1, **kwargs) -> typing.Tuple[np.array, np.array, np.array]:
     """Perform log_spectrogram data analysis
 
         Args:
@@ -208,7 +208,7 @@ def log_spectrogram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int 
     return power, freq, time
 
 def lofar(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0,
-        decimation_rate: int = 1) -> typing.Tuple[np.array, np.array, np.array]:
+        decimation_rate: int = 1, **kwargs) -> typing.Tuple[np.array, np.array, np.array]:
     """Perform lofar data analysis
 
         Args:
