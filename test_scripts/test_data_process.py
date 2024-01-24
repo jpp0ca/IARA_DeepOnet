@@ -17,6 +17,7 @@ def main():
         n_pts = 640,
         n_overlap = 0,
         decimation_rate = 3,
+        frequency_limit=5e3
     )
 
     print(dp.get_data(dataset_id=100))

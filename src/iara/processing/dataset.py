@@ -49,7 +49,8 @@ class DatasetProcessor():
                 n_mels: int = 256,
                 decimation_rate: int = 1,
                 extract_id: typing.Callable[[str], int] = get_id,
-                input_type: InputType = InputType.WINDOW
+                input_type: InputType = InputType.WINDOW,
+                frequency_limit: float = None
                 ) -> None:
         """
         Parameters:
@@ -64,6 +65,8 @@ class DatasetProcessor():
             extract_id (Callable[[str], str]): Function to extract ID from a file name without
                 extension. Default is split based on '-' em get last part of the name
             input_type (InputType): Type of input data. Default WINDOW.
+            frequency_limit (float): The frequency limit to be considered in the data
+                processing result. Default is fs/2
         """
         self.data_base_dir = data_base_dir
         self.dataframe_base_dir = dataframe_base_dir
@@ -75,6 +78,7 @@ class DatasetProcessor():
         self.decimation_rate = decimation_rate
         self.extract_id = extract_id
         self.input_type = input_type
+        self.frequency_limit = frequency_limit
         self.load_data = {}
 
         os.makedirs(self.dataframe_base_dir, exist_ok=True)
@@ -132,6 +136,12 @@ class DatasetProcessor():
 
             columns = [f'f {i}' for i in range(len(freqs))]
             df = pd.DataFrame(row_list, columns=columns)
+
+            if self.frequency_limit:
+                index_limit = next((i for i, freq in enumerate(freqs)
+                                    if freq > self.frequency_limit), len(freqs))
+                df = df.iloc[:, :index_limit]
+
             df.to_pickle(dataset_file)
 
             self.load_data[dataset_id] = df
