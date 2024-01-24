@@ -14,15 +14,13 @@ def main():
         dataframe_base_dir = "./data/lofar",
         normalization = iara_proc.Normalization.NORM_L2,
         analysis = iara_proc.Analysis.LOFAR,
-        n_pts = 1024,
+        n_pts = 640,
         n_overlap = 0,
-        n_mels = 256,
         decimation_rate = 3,
     )
 
-    print(dp.get_data(iara_id=100))
-    print(dp.get_data(iara_id=range(5,10)))
-    print(dp.get_data(iara_id=[101]))
+    print(dp.get_data(dataset_id=100))
+    print(dp.get_training_data(dataset_ids=range(5,10), targets=[2, 2, 1, 1, 1]))
 
 if __name__ == "__main__":
     main()

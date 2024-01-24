@@ -1,4 +1,4 @@
-IARA ID,Dataset,Ship ID,SHIPTYPE,TYPE,DETAILED TYPE,Name,CPA time,Rain,Temperature,Wind,Sea state,Rain state
+ID,Dataset,Ship ID,SHIPTYPE,TYPE,DETAILED TYPE,Name,CPA time,Rain,Temperature,Wind,Sea state,Rain state
 1,A,1,59,Special Craft,Anchor Handling Vessel,MAERSK PACER,150,0,25.4,2.7,2,No rain
 2,A,2,50,Special Craft,Pilot Vessel,PILOT 10,150,0,26.1,8.1,4,No rain
 3,A,3,59,Special Craft,Offshore Supply Ship,KAN TAN 302,82,0,23.9,4.6,3,No rain

@@ -157,7 +157,9 @@ def spectrogram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0,
                 - 2D array representing power spectrum.
                 - 1D array with output frequencies.
                 - 1D array with relative time to sample 0 of the data.
-        """
+    """
+    # pylint: disable=unused-argument
+
     data = data - np.mean(data)
 
     n_pts = n_pts * 2
@@ -200,7 +202,8 @@ def log_spectrogram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int 
                 - 2D array representing power spectrum.
                 - 1D array with output frequencies.
                 - 1D array with relative time to sample 0 of the data.
-        """
+    """
+    # pylint: disable=unused-argument
     power, freq, time = spectrogram(data, fs, n_pts, n_overlap, decimation_rate)
     power[power < 1e-9] = 1e-9
     power = 20*np.log10(power)
@@ -224,7 +227,8 @@ def lofar(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0,
                 - 2D array representing power spectrum.
                 - 1D array with output frequencies.
                 - 1D array with relative time to sample 0 of the data.
-        """
+    """
+    # pylint: disable=unused-argument
     power, freq, time = log_spectrogram(data, fs, n_pts, n_overlap, decimation_rate)
     power = power - tpsw(power)
     power[power < -0.2] = 0

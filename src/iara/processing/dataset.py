@@ -18,12 +18,6 @@ import scipy.io.wavfile as scipy_wav
 
 import iara.processing.analysis as iara_proc
 
-
-class InputType(enum.Enum):
-    """Enum defining training types."""
-    WINDOW = 0
-    IMAGE = 1
-
 def get_id(file:str) -> int:
     """
     Default function to extracts the ID from the given file name.
@@ -35,6 +29,12 @@ def get_id(file:str) -> int:
         int: The extracted ID.
     """
     return int(file.rsplit('-',maxsplit=1)[-1])
+
+
+class InputType(enum.Enum):
+    """Enum defining training types."""
+    WINDOW = 0
+    IMAGE = 1
 
 class DatasetProcessor():
     """ Class for handling acess to process data from a dataset. """
@@ -79,13 +79,12 @@ class DatasetProcessor():
 
         os.makedirs(self.dataframe_base_dir, exist_ok=True)
 
-
-    def find_raw_file(self, iara_id: int) -> str:
+    def find_raw_file(self, dataset_id: int) -> str:
         """
         Finds the raw file associated with the given ID.
 
         Parameters:
-            iara_id (int): The ID to search for.
+            dataset_id (int): The ID to search for.
 
         Returns:
             str: The path to the raw file.
@@ -96,21 +95,21 @@ class DatasetProcessor():
         for root, _, files in os.walk(self.data_base_dir):
             for file in files:
                 filename, extension = os.path.splitext(file)
-                if extension == ".wav" and self.extract_id(filename) == iara_id:
+                if extension == ".wav" and self.extract_id(filename) == dataset_id:
                     return os.path.join(root, file)
-        raise UnboundLocalError(f'file {iara_id} not found in {self.data_base_dir}')
+        raise UnboundLocalError(f'file {dataset_id} not found in {self.data_base_dir}')
 
-    def __load(self, iara_id: int):
+    def __load(self, dataset_id: int):
 
         if self.input_type == InputType.WINDOW:
 
-            dataset_file = os.path.join(self.dataframe_base_dir, f'{iara_id}.pkl')
+            dataset_file = os.path.join(self.dataframe_base_dir, f'{dataset_id}.pkl')
 
             if os.path.exists(dataset_file):
-                self.load_data[iara_id] = pd.read_pickle(dataset_file)
+                self.load_data[dataset_id] = pd.read_pickle(dataset_file)
                 return
 
-            file = self.find_raw_file(iara_id = iara_id)
+            file = self.find_raw_file(dataset_id = dataset_id)
 
             fs, data = scipy_wav.read(file)
 
@@ -135,30 +134,51 @@ class DatasetProcessor():
             df = pd.DataFrame(row_list, columns=columns)
             df.to_pickle(dataset_file)
 
-            self.load_data[iara_id] = df
+            self.load_data[dataset_id] = df
 
         else:
             raise NotImplementedError(f'input type {str(self.input_type)} not implemented')
 
-
-    def get_data(self, iara_id: typing.Union[int, typing.List[int]]) -> pd.DataFrame:
+    def get_data(self, dataset_id: int) -> pd.DataFrame:
         """
-        Gets data for the given ID or list of IDs.
+        Get data for the given ID.
 
         Parameters:
-            iara_id (Union[int, List[int]]): The ID or list of IDs to get data for.
+            dataset_id (int): The ID to get data for.
 
         Returns:
             pd.DataFrame: The DataFrame containing the processed data.
         """
+        if not dataset_id in self.load_data:
+            self.__load(dataset_id)
 
-        if isinstance(iara_id, int):
-            if not iara_id in self.load_data:
-                self.__load(iara_id)
-            return self.load_data[iara_id]
+        return self.load_data[dataset_id]
 
+    def get_training_data(self, dataset_ids: typing.Iterable[int],
+                          targets: typing.Iterable) -> typing.Tuple[pd.DataFrame, pd.Series]:
+        """
+        Gets data for the given IDs.
+
+        Parameters:
+            dataset_ids (Iterable[int]): The list of IDs to get data for;
+                a pd.Series of ints can be passed as well.
+            targets (Iterable): List of target values corresponding to the dataset IDs.
+
+        Returns:
+            Tuple[pd.DataFrame, pd.Series]:
+                - pd.DataFrame: The DataFrame containing the processed data.
+                - pd.Series: The Series containing the target values,
+                    with the same type as the target input.
+        """
         result_df = pd.DataFrame()
-        for local_id in iara_id if len(iara_id) == 1 else tqdm.tqdm(
-                                                        iara_id, desc='Get data', leave=False):
-            result_df = pd.concat([result_df, self.get_data(local_id)], ignore_index=True)
-        return result_df
+        result_target = pd.Series()
+
+        for local_id, target in tqdm.tqdm(
+                                list(zip(dataset_ids, targets)), desc='Get data', leave=False):
+            data_df = self.get_data(local_id)
+            result_df = pd.concat([result_df, data_df], ignore_index=True)
+
+            replicated_targets = pd.Series([target] * len(data_df), name='Target')
+            result_target = pd.concat([result_target, replicated_targets], ignore_index=True)
+
+        return result_df, result_target
