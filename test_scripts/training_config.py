@@ -16,7 +16,7 @@ def main(override: bool = True, only_first_fold = True):
 
     dp = iara_data_proc.DatasetProcessor(
         data_base_dir = "./data/raw_dataset",
-        dataframe_base_dir = "./data/lofar",
+        data_processed_base_dir = "./data/processed",
         normalization = iara_proc.Normalization.NORM_L2,
         analysis = iara_proc.Analysis.LOFAR,
         n_pts = 640,

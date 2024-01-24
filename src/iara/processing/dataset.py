@@ -13,10 +13,17 @@ import os
 import enum
 import typing
 import tqdm
+
+import PIL
 import pandas as pd
+import numpy as np
 import scipy.io.wavfile as scipy_wav
+import matplotlib.pyplot as plt
+import matplotlib.colors as color
+import tikzplotlib as tikz
 
 import iara.processing.analysis as iara_proc
+import iara.processing.prefered_number as iara_pn
 
 def get_id(file:str) -> int:
     """
@@ -30,18 +37,30 @@ def get_id(file:str) -> int:
     """
     return int(file.rsplit('-',maxsplit=1)[-1])
 
+class PlotType(enum.Enum):
+    """Enum defining plot types."""
+    SHOW_FIGURE = 0
+    EXPORT_RAW = 1
+    EXPORT_PLOT = 2
+    EXPORT_TEX = 3
+
+    def __str__(self):
+        return str(self.name).rsplit('_', maxsplit=1)[-1].lower()
 
 class InputType(enum.Enum):
     """Enum defining training types."""
     WINDOW = 0
     IMAGE = 1
 
+    def __str__(self):
+        return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
+
 class DatasetProcessor():
     """ Class for handling acess to process data from a dataset. """
 
     def __init__(self,
                 data_base_dir: str,
-                dataframe_base_dir: str,
+                data_processed_base_dir: str,
                 normalization: iara_proc.Normalization,
                 analysis: iara_proc.Analysis,
                 n_pts: int = 1024,
@@ -55,7 +74,7 @@ class DatasetProcessor():
         """
         Parameters:
             data_base_dir (str): Base directory for raw data.
-            dataframe_base_dir (str): Base directory for dataframes.
+            data_processed_base_dir (str): Base directory for process data.
             normalization (iara_proc.Normalization): Normalization object.
             analysis (iara_proc.Analysis): Analysis object.
             n_pts (int): Number of points for use in analysis.
@@ -69,7 +88,7 @@ class DatasetProcessor():
                 processing result. Default is fs/2
         """
         self.data_base_dir = data_base_dir
-        self.dataframe_base_dir = dataframe_base_dir
+        self.data_processed_base_dir = data_processed_base_dir
         self.normalization = normalization
         self.analysis = analysis
         self.n_pts = n_pts
@@ -81,7 +100,9 @@ class DatasetProcessor():
         self.frequency_limit = frequency_limit
         self.load_data = {}
 
-        os.makedirs(self.dataframe_base_dir, exist_ok=True)
+        self.data_processed_dir = os.path.join(self.data_processed_base_dir,
+                                  str(self.analysis) + "_" + str(self.input_type))
+        os.makedirs(self.data_processed_dir, exist_ok=True)
 
     def find_raw_file(self, dataset_id: int) -> str:
         """
@@ -103,31 +124,43 @@ class DatasetProcessor():
                     return os.path.join(root, file)
         raise UnboundLocalError(f'file {dataset_id} not found in {self.data_base_dir}')
 
+    def __process(self, dataset_id: int) -> typing.Tuple[np.array, np.array, np.array]:
+
+        file = self.find_raw_file(dataset_id = dataset_id)
+
+        fs, data = scipy_wav.read(file)
+
+        if data.ndim != 1:
+            data = data[:,0]
+
+        power, freqs, times = self.analysis.apply(data = data,
+                                                    fs = fs,
+                                                    n_pts = self.n_pts,
+                                                    n_overlap = self.n_overlap,
+                                                    n_mels = self.n_mels,
+                                                    decimation_rate = self.decimation_rate)
+
+        power = self.normalization(power)
+
+        if self.frequency_limit:
+            index_limit = next((i for i, freq in enumerate(freqs)
+                                if freq > self.frequency_limit), len(freqs))
+            freqs = freqs[:index_limit]
+            power = power[:index_limit,:]
+
+        return power, freqs, times
+
     def __load(self, dataset_id: int):
 
         if self.input_type == InputType.WINDOW:
 
-            dataset_file = os.path.join(self.dataframe_base_dir, f'{dataset_id}.pkl')
+            dataset_file = os.path.join(self.data_processed_dir, f'{dataset_id}.pkl')
 
             if os.path.exists(dataset_file):
                 self.load_data[dataset_id] = pd.read_pickle(dataset_file)
                 return
 
-            file = self.find_raw_file(dataset_id = dataset_id)
-
-            fs, data = scipy_wav.read(file)
-
-            if data.ndim != 1:
-                data = data[:,0]
-
-            power, freqs, times = self.analysis.apply(data = data,
-                                                        fs = fs,
-                                                        n_pts = self.n_pts,
-                                                        n_overlap = self.n_overlap,
-                                                        n_mels = self.n_mels,
-                                                        decimation_rate = self.decimation_rate)
-
-            power = self.normalization(power)
+            power, freqs, times = self.__process(dataset_id)
 
             row_list = []
             for t in range(len(times)):
@@ -136,12 +169,6 @@ class DatasetProcessor():
 
             columns = [f'f {i}' for i in range(len(freqs))]
             df = pd.DataFrame(row_list, columns=columns)
-
-            if self.frequency_limit:
-                index_limit = next((i for i, freq in enumerate(freqs)
-                                    if freq > self.frequency_limit), len(freqs))
-                df = df.iloc[:, :index_limit]
-
             df.to_pickle(dataset_file)
 
             self.load_data[dataset_id] = df
@@ -192,3 +219,104 @@ class DatasetProcessor():
             result_target = pd.concat([result_target, replicated_targets], ignore_index=True)
 
         return result_df, result_target
+
+    def plot(self,
+             dataset_id: typing.Union[int, typing.Iterable[int]],
+             plot_type: PlotType = PlotType.EXPORT_PLOT,
+             frequency_in_x_axis: bool=False,
+             colormap: color.Colormap = plt.get_cmap('jet'),
+             override: bool = False) -> None:
+        """
+        Display or save images with processed data.
+
+        Parameters:
+            dataset_id (Union[int, Iterable[int]]): ID or list of IDs of the dataset to plot.
+            plot_type (PlotType): Type of plot to generate (default: PlotType.EXPORT_PLOT).
+            frequency_in_x_axis (bool): If True, plot frequency values on the x-axis.
+                Default: False.
+            colormap (Colormap): Colormap to use for the plot. Default: 'jet'.
+            override (bool): If True, override any existing saved plots. Default: False.
+
+        Returns:
+            None
+        """
+        if plot_type != PlotType.SHOW_FIGURE:
+            output_dir = os.path.join(self.data_processed_base_dir,
+                                      str(self.analysis) + "_" + str(plot_type))
+            os.makedirs(output_dir, exist_ok=True)
+
+        if not isinstance(dataset_id, int):
+            for local_id in tqdm.tqdm(dataset_id, desc='Plot', leave=False):
+                self.plot(
+                    dataset_id = local_id,
+                    plot_type = plot_type,
+                    frequency_in_x_axis = frequency_in_x_axis,
+                    colormap = colormap,
+                    override = override)
+            return
+
+        if plot_type == PlotType.EXPORT_RAW or plot_type == PlotType.EXPORT_PLOT:
+            filename = os.path.join(output_dir,f'{dataset_id}.png')
+        elif plot_type == PlotType.EXPORT_TEX:
+            filename = os.path.join(output_dir,f'{dataset_id}.tex')
+        else:
+            filename = " "
+
+        if os.path.exists(filename) and not override:
+            return
+
+        power, freqs, times = self.__process(dataset_id)
+
+        if frequency_in_x_axis:
+            power = power.T
+
+        if plot_type == PlotType.EXPORT_RAW:
+            power = colormap(power)
+            power_color = (power * 255).astype(np.uint8)
+            image = PIL.Image.fromarray(power_color)
+            image.save(filename)
+            return
+
+        times[0] = 0
+        freqs[0] = 0
+
+        n_ticks = 5
+        x_labels = [iara_pn.get_engineering_notation(times[i], "s")
+                    for i in np.linspace(0, len(times)-1, num=n_ticks, dtype=int)]
+
+        y_labels = [iara_pn.get_engineering_notation(freqs[i], "Hz")
+                    for i in np.linspace(0, len(freqs)-1, num=n_ticks, dtype=int)]
+
+        x_ticks = [(x/4 * (len(times)-1)) for x in range(n_ticks)]
+        y_ticks = [(y/4 * (len(freqs)-1)) for y in range(n_ticks)]
+
+        plt.figure()
+        plt.imshow(power, aspect='auto', origin='lower', cmap=colormap)
+        plt.colorbar()
+
+        if frequency_in_x_axis:
+            plt.ylabel('Time')
+            plt.xlabel('Frequency')
+            plt.yticks(x_ticks)
+            plt.gca().set_yticklabels(x_labels)
+            plt.xticks(y_ticks)
+            plt.gca().set_xticklabels(y_labels)
+            plt.gca().invert_yaxis()
+        else:
+            plt.xlabel('Time')
+            plt.ylabel('Frequency')
+            plt.xticks(x_ticks)
+            plt.gca().set_xticklabels(x_labels)
+            plt.yticks(y_ticks)
+            plt.gca().set_yticklabels(y_labels)
+
+        plt.tight_layout()
+
+        if plot_type == PlotType.SHOW_FIGURE:
+            plt.show()
+        elif plot_type == PlotType.EXPORT_PLOT:
+            plt.savefig(filename)
+            plt.close()
+        elif plot_type == PlotType.EXPORT_TEX:
+            tikz.save(filename)
+            plt.close()
