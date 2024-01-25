@@ -11,14 +11,14 @@ import iara.processing.analysis as iara_proc
 import iara.processing.dataset as iara_data_proc
 
 
-def main(override: bool = True, only_first_fold = True):
+def main(override: bool = False, only_first_fold = True):
     """Main function for the test Training Configuration."""
 
     dp = iara_data_proc.DatasetProcessor(
         data_base_dir = "./data/raw_dataset",
         data_processed_base_dir = "./data/processed",
         normalization = iara_proc.Normalization.NORM_L2,
-        analysis = iara_proc.Analysis.LOFAR,
+        analysis = iara_proc.SpectralAnalysis.LOFAR,
         n_pts = 640,
         n_overlap = 0,
         decimation_rate = 3,
@@ -36,32 +36,31 @@ def main(override: bool = True, only_first_fold = True):
             pass
 
     if not config:
-        dataset = iara.trainer.TrainingDataset(
-                        dataset = iara.description.Subdataset.OS_CPA_IN,
-                        target = iara.trainer.DatasetSelection(
-                            column = 'TYPE',
-                            values = ['Cargo', 'Tanker', 'Tug'], # , 'Passenger'
-                            include_others = False
-                        ),
-                        only_sample=True
-                    )
-        # dataset = iara.trainer.TrainingDataset(
-        #                 dataset_base_dir = "./data/raw_dataset",
-        #                 dataset = iara.description.Subdataset.OS_CPA_IN,
-        #                 target = iara.trainer.DatasetSelection(
-        #                     column = 'DETAILED TYPE',
-        #                     values = ['Bulk Carrier', 'Container Ship'],
-        #                     include_others = True
+        # dataset = iara.description.CustomDataset(
+        #                 dataset_type = iara.description.DatasetType.OS_CPA_IN,
+        #                 target = iara.description.DatasetTarget(
+        #                     column = 'TYPE',
+        #                     values = ['Cargo', 'Tanker', 'Tug'], # , 'Passenger'
+        #                     include_others = False
         #                 ),
-        #                 filters = [
-        #                     iara.trainer.DatasetSelection(
-        #                         column = 'Rain state',
-        #                         values = ['No rain']),
-        #                     iara.trainer.DatasetSelection(
-        #                         column = 'TYPE',
-        #                         values = ['Cargo']),
-        #                 ]
+        #                 only_sample=True
         #             )
+        dataset = iara.description.CustomDataset(
+                        dataset_type = iara.description.DatasetType.OS_CPA_IN,
+                        target = iara.description.DatasetTarget(
+                            column = 'DETAILED TYPE',
+                            values = ['Bulk Carrier', 'Container Ship'],
+                            include_others = True
+                        ),
+                        filters = [
+                            iara.description.DatasetFilter(
+                                column = 'Rain state',
+                                values = ['No rain']),
+                            iara.description.DatasetFilter(
+                                column = 'TYPE',
+                                values = ['Cargo']),
+                        ]
+                    )
 
         config = iara.trainer.TrainingConfig(
                         name = config_name,
@@ -72,8 +71,10 @@ def main(override: bool = True, only_first_fold = True):
 
         config.save(config_dir)
 
-        trainer = iara.trainer.Trainer(config)
-        trainer.run(only_first_fold = only_first_fold)
+    print(config)
+
+    trainer = iara.trainer.Trainer(config)
+    trainer.run(only_first_fold = only_first_fold)
 
 
 if __name__ == "__main__":

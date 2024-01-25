@@ -13,7 +13,7 @@ def main():
         data_base_dir = "./data/raw_dataset",
         data_processed_base_dir = "./data/processed",
         normalization = iara_proc.Normalization.NORM_L2,
-        analysis = iara_proc.Analysis.LOFAR,
+        analysis = iara_proc.SpectralAnalysis.LOFAR,
         n_pts = 640,
         n_overlap = 0,
         decimation_rate = 3,

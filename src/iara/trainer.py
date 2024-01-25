@@ -1,9 +1,8 @@
 """
 Trainer description Module
 
-This module provides classes for configure and training.
+This module provides classes for configure and training machine learning models.
 """
-import enum
 import os
 import typing
 import datetime
@@ -16,78 +15,6 @@ import sklearn.model_selection as sk_selection
 import iara.description
 import iara.processing.dataset as iara_data_proc
 
-class TrainingType(enum.Enum):
-    """Enum defining training types."""
-    WINDOW = 0
-    IMAGE = 1
-
-    def to_json(self) -> str:
-        """Return the string equivalent of the enum."""
-        return self.name
-
-class DatasetSelection():
-    """Class representing a filter to apply or a training target on a dataset."""
-    def __init__(self,
-                 column: str,
-                 values: typing.List[str],
-                 include_others: bool = False):
-        """
-        Parameters:
-        - column (str): Name of the column for selection.
-        - values (List[str]): List of values for selection.
-        - include_others (bool, optional): Indicates whether other values should be compiled as one
-            and included, make sense only when using as target. Default is False.
-        """
-        self.column = column
-        self.values = values
-        self.include_others = include_others
-
-class TrainingDataset:
-    """Class representing a training dataset."""
-
-    def __init__(self,
-                 dataset: iara.description.Subdataset,
-                 target: DatasetSelection,
-                 filters: typing.List[DatasetSelection] = None,
-                 only_sample: bool = False):
-        """
-        Parameters:
-        - dataset (iara.description.Subdataset): Subdataset to be used.
-        - target (DatasetSelection): Target selection for training.
-        - filters (List[DatasetSelection], optional): List of filters to be applied.
-            Default is use all dataset.
-        - only_sample (bool, optional): Use only data available in sample dataset. Default is False.
-        """
-        self.dataset = dataset
-        self.target = target
-        self.filters = filters if filters else []
-        self.only_sample = only_sample
-
-    def get_dataset_info(self) -> pd.DataFrame:
-        """
-        Generate a DataFrame with information from the dataset based on specified filters
-            and target configuration.
-
-        Returns:
-            pd.DataFrame: DataFrame containing the dataset information after applying filters
-                and target mapping.
-        """
-        df = self.dataset.to_dataframe(only_sample=self.only_sample)
-        for filt in self.filters:
-            df = df.loc[df[filt.column].isin(filt.values)]
-
-        if not self.target.include_others:
-            df = df.loc[df[self.target.column].isin(self.target.values)]
-
-        df['Target'] = df[self.target.column].map(
-            {value: index for index, value in enumerate(self.target.values)})
-        df['Target'] = df['Target'].fillna(len(self.target.values))
-        df['Target'] = df['Target'].astype(int)
-
-        return df
-
-    def __str__(self) -> str:
-        return str(self.get_dataset_info())
 
 class TrainingConfig:
     """Class representing training configuration."""
@@ -95,19 +22,21 @@ class TrainingConfig:
 
     def __init__(self,
                 name: str,
-                dataset: TrainingDataset,
+                dataset: iara.description.CustomDataset,
                 dataset_processor: iara_data_proc.DatasetProcessor,
                 output_base_dir: str,
                 n_folds: int = 10,
                 test_factor: float = 0.2):
         """
         Parameters:
-        - name (str): Unique identifier for the training configuration.
-        - dataset (TrainingDataset): Training dataset.
-        - dataset_processor (iara.processing.dataset.DatasetProcessor): DatasetProcessor,
-        - output_base_dir (str): Base directory for training output.
-        - training_type (TrainingType, optional): Type of training. Default is TrainingType.WINDOW.
-        - n_folds (int, optional): Number of folds in training. Default is 10.
+        - name (str): A unique identifier for the training configuration.
+        - dataset (iara.description.CustomDataset): The dataset used for training.
+        - dataset_processor (iara.processing.dataset.DatasetProcessor):
+            The DatasetProcessor for accessing and processing data in the dataset.
+        - output_base_dir (str): The base directory for storing training outputs.
+        - n_folds (int, optional): Number of folds for Kfold cross-validation. Default is 10.
+        - test_factor (float, optional): Fraction of the dataset reserved for the test subset.
+            Default is 0.2 (20%).
         """
         self.timestring = datetime.datetime.now().strftime(self.time_str_format)
         self.name = name
@@ -116,6 +45,9 @@ class TrainingConfig:
         self.output_base_dir = os.path.join(output_base_dir, self.name)
         self.n_folds = n_folds
         self.test_factor = test_factor
+
+    def __str__(self) -> str:
+        return  f"----------- {self.name} ----------- \n{str(self.dataset)}"
 
     def save(self, file_dir: str) -> None:
         """Save the TrainingConfig to a JSON file."""
@@ -133,9 +65,6 @@ class TrainingConfig:
             json_str = json_file.read()
         return jsonpickle.decode(json_str)
 
-    def __str__(self) -> str:
-        return  f"----------- {self.name} ----------- \n{str(self.dataset)}"
-
     def get_split_datasets(self) -> \
         typing.Tuple[pd.DataFrame, typing.List[typing.Tuple[pd.DataFrame, pd.DataFrame]]]:
         """
@@ -144,7 +73,7 @@ class TrainingConfig:
         Returns:
         - test_set (pd.DataFrame): Test set with a stratified split.
         - train_val_set_list (list): List of tuples containing training and validation sets
-            for each fold.
+            for each fold in StratifiedKFold strategy
         """
         df = self.dataset.get_dataset_info()
 
@@ -168,9 +97,8 @@ class TrainingConfig:
 
         return test_set, train_val_set_list
 
-
 class Trainer():
-    """Class for manage and execute training from a TrainingConfig"""
+    """Class for managing and executing training based on a TrainingConfig"""
 
     def __init__(self, config: TrainingConfig) -> None:
         self.config = config
@@ -205,12 +133,12 @@ class Trainer():
         self.config.save(self.config.output_base_dir)
 
     def run(self, only_first_fold: bool = False):
-        """Execute training from the TrainingConfig"""
+        """Execute training based on the TrainingConfig"""
         self.__prepare_output_dir()
 
-        test_set, train_val_set_list = self.config.get_split_datasets()
+        _, train_val_set_list = self.config.get_split_datasets()
 
-        for i_fold, (train_set, val_set) in enumerate(train_val_set_list):
+        for i_fold, (train_set, _) in enumerate(train_val_set_list):
 
             print(f'--------{i_fold}--------')
             print(train_set['Target'])

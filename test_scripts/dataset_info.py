@@ -6,6 +6,7 @@ In the future, this test should lead to an application that generates .tex table
     to be used in the dataset publication article.
 """
 import pandas as pd
+
 import iara.description
 
 
@@ -13,11 +14,11 @@ def main(show_sample_dataset = False):
     """Main function for the dataset info tables."""
 
     os_ship_merged = []
-    for sub in iara.description.Subdataset:
-        if sub.value > iara.description.Subdataset.OS_SHIP.value:
+    for sub in iara.description.DatasetType:
+        if sub.value > iara.description.DatasetType.OS_SHIP.value:
             continue
 
-        df = sub.to_dataframe(only_sample=show_sample_dataset)
+        df = sub.info_to_df(only_sample=show_sample_dataset)
         part = df.groupby(['TYPE','DETAILED TYPE']).size().reset_index(name=str(sub))
 
         if not isinstance(os_ship_merged, pd.DataFrame):
@@ -33,7 +34,7 @@ def main(show_sample_dataset = False):
     print(os_ship_merged)
 
 
-    os_bg = iara.description.Subdataset.E.to_dataframe(only_sample=show_sample_dataset)
+    os_bg = iara.description.DatasetType.E.info_to_df(only_sample=show_sample_dataset)
     os_bg_merged = os_bg.groupby(['Rain state', 'Sea state']).size().reset_index(name='Qtd')
 
     order = {str(rain_enum): rain_enum.value for rain_enum in iara.description.Rain}

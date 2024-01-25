@@ -25,7 +25,7 @@ import tikzplotlib as tikz
 import iara.processing.analysis as iara_proc
 import iara.processing.prefered_number as iara_pn
 
-def get_id(file:str) -> int:
+def get_iara_id(file:str) -> int:
     """
     Default function to extracts the ID from the given file name.
 
@@ -62,12 +62,12 @@ class DatasetProcessor():
                 data_base_dir: str,
                 data_processed_base_dir: str,
                 normalization: iara_proc.Normalization,
-                analysis: iara_proc.Analysis,
+                analysis: iara_proc.SpectralAnalysis,
                 n_pts: int = 1024,
                 n_overlap: int = 0,
                 n_mels: int = 256,
                 decimation_rate: int = 1,
-                extract_id: typing.Callable[[str], int] = get_id,
+                extract_id: typing.Callable[[str], int] = get_iara_id,
                 input_type: InputType = InputType.WINDOW,
                 frequency_limit: float = None
                 ) -> None:
@@ -104,7 +104,7 @@ class DatasetProcessor():
                                   str(self.analysis) + "_" + str(self.input_type))
         os.makedirs(self.data_processed_dir, exist_ok=True)
 
-    def find_raw_file(self, dataset_id: int) -> str:
+    def _find_raw_file(self, dataset_id: int) -> str:
         """
         Finds the raw file associated with the given ID.
 
@@ -124,9 +124,9 @@ class DatasetProcessor():
                     return os.path.join(root, file)
         raise UnboundLocalError(f'file {dataset_id} not found in {self.data_base_dir}')
 
-    def __process(self, dataset_id: int) -> typing.Tuple[np.array, np.array, np.array]:
+    def _process(self, dataset_id: int) -> typing.Tuple[np.array, np.array, np.array]:
 
-        file = self.find_raw_file(dataset_id = dataset_id)
+        file = self._find_raw_file(dataset_id = dataset_id)
 
         fs, data = scipy_wav.read(file)
 
@@ -160,15 +160,10 @@ class DatasetProcessor():
                 self.load_data[dataset_id] = pd.read_pickle(dataset_file)
                 return
 
-            power, freqs, times = self.__process(dataset_id)
-
-            row_list = []
-            for t in range(len(times)):
-                row = list(power[:,t].flatten())
-                row_list.append(row)
+            power, freqs, _ = self._process(dataset_id)
 
             columns = [f'f {i}' for i in range(len(freqs))]
-            df = pd.DataFrame(row_list, columns=columns)
+            df = pd.DataFrame(power.T, columns=columns)
             df.to_pickle(dataset_file)
 
             self.load_data[dataset_id] = df
@@ -191,15 +186,17 @@ class DatasetProcessor():
 
         return self.load_data[dataset_id]
 
-    def get_training_data(self, dataset_ids: typing.Iterable[int],
+    def get_training_data(self,
+                          dataset_ids: typing.Iterable[int],
                           targets: typing.Iterable) -> typing.Tuple[pd.DataFrame, pd.Series]:
         """
-        Gets data for the given IDs.
+        Retrieve data for the given dataset IDs.
 
         Parameters:
-            dataset_ids (Iterable[int]): The list of IDs to get data for;
+            - dataset_ids (Iterable[int]): The list of IDs to fetch data for;
                 a pd.Series of ints can be passed as well.
-            targets (Iterable): List of target values corresponding to the dataset IDs.
+            - targets (Iterable): List of target values corresponding to the dataset IDs.
+                Should have the same number of elements as dataset_ids.
 
         Returns:
             Tuple[pd.DataFrame, pd.Series]:
@@ -265,7 +262,7 @@ class DatasetProcessor():
         if os.path.exists(filename) and not override:
             return
 
-        power, freqs, times = self.__process(dataset_id)
+        power, freqs, times = self._process(dataset_id)
 
         if frequency_in_x_axis:
             power = power.T
@@ -281,14 +278,14 @@ class DatasetProcessor():
         freqs[0] = 0
 
         n_ticks = 5
-        x_labels = [iara_pn.get_engineering_notation(times[i], "s")
+        time_labels = [iara_pn.get_engineering_notation(times[i], "s")
                     for i in np.linspace(0, len(times)-1, num=n_ticks, dtype=int)]
 
-        y_labels = [iara_pn.get_engineering_notation(freqs[i], "Hz")
+        frequency_labels = [iara_pn.get_engineering_notation(freqs[i], "Hz")
                     for i in np.linspace(0, len(freqs)-1, num=n_ticks, dtype=int)]
 
-        x_ticks = [(x/4 * (len(times)-1)) for x in range(n_ticks)]
-        y_ticks = [(y/4 * (len(freqs)-1)) for y in range(n_ticks)]
+        time_ticks = [(x/4 * (len(times)-1)) for x in range(n_ticks)]
+        frequency_ticks = [(y/4 * (len(freqs)-1)) for y in range(n_ticks)]
 
         plt.figure()
         plt.imshow(power, aspect='auto', origin='lower', cmap=colormap)
@@ -297,18 +294,18 @@ class DatasetProcessor():
         if frequency_in_x_axis:
             plt.ylabel('Time')
             plt.xlabel('Frequency')
-            plt.yticks(x_ticks)
-            plt.gca().set_yticklabels(x_labels)
-            plt.xticks(y_ticks)
-            plt.gca().set_xticklabels(y_labels)
+            plt.yticks(time_ticks)
+            plt.gca().set_yticklabels(time_labels)
+            plt.xticks(frequency_ticks)
+            plt.gca().set_xticklabels(frequency_labels)
             plt.gca().invert_yaxis()
         else:
             plt.xlabel('Time')
             plt.ylabel('Frequency')
-            plt.xticks(x_ticks)
-            plt.gca().set_xticklabels(x_labels)
-            plt.yticks(y_ticks)
-            plt.gca().set_yticklabels(y_labels)
+            plt.xticks(time_ticks)
+            plt.gca().set_xticklabels(time_labels)
+            plt.yticks(frequency_ticks)
+            plt.gca().set_yticklabels(frequency_labels)
 
         plt.tight_layout()
 

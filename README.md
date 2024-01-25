@@ -1,5 +1,7 @@
 # IARA
-This project aims to disseminate acoustic data through the implementation of scientific work. The repository contains PyTorch code for reading the dataset in different configurations, separating folds, and training structures for the results presented in the article.
+This project aims to disseminate acoustic data through the implementation of scientific work.
+The repository contains PyTorch code for reading the archive in different configurations,
+    separating standard folds, and training structures for the results presented in the article.
 
 ## Authors
 - **Main author**: Fábio Oliveira
@@ -7,18 +9,27 @@ This project aims to disseminate acoustic data through the implementation of sci
 
 ## Repository Structure
 
-- **data_sample/:** Sample of acoustic datasets.
-- **notebooks/:** Demonstrations and analyses in Jupyter notebooks.
-- **src/:** PyTorch code for reading data, separating folds, and training models.
-- **scripts/:** Helper scripts for preprocessing and cross-validation.
+- **data/:** This directory serves as the default location to store raw and processed data.
+- **notebooks/:** Explore demonstrations and tutorials in Jupyter notebooks.
+- **src/:** Contains the code organized as a pip package. It includes functionality for reading data, separating folds, and training models
+- **test_scripts/:** Utilize scripts for development and testing of features within the pip package.
+- **training_scripts/:** Access scripts used for training, generating plots, and creating tables presented in the final article.
 
 ## Installation
 
-Detailed instructions on how to install project dependencies are available in the README.
-
+### Development Mode
+To install the IARA library in development mode, navigate to the `src` folder and run the following command
+```bash
 pip install -e . --user
+```
+
+### Deployment Mode
+To install the IARA library in deploy mode, navigate to the `src` folder and run the following command
+```bash
+pip install .
+```
+
 
 ## Usage
 
-Explore the README to learn how to use the code and run experiments.
-
+Refer to the `notebooks` directory for a detailed guide on accessing and using IARA

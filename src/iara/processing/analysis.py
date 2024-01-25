@@ -5,13 +5,14 @@ This module contains a class and functions for applying spectral analysis to inp
 """
 import enum
 import typing
+
 import numpy as np
 import scipy.signal as sci
 import librosa
 
 
-class Analysis(enum.Enum):
-    """ Enum class to represent and process the spectral analyzes available in this module """
+class SpectralAnalysis(enum.Enum):
+    """ Enum class to represent and process the available spectral analyzes in this module """
     SPECTROGRAM = 1
     LOG_SPECTROGRAM = 2
     LOFAR = 3
@@ -22,16 +23,17 @@ class Analysis(enum.Enum):
         return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
 
     def apply(self, *args, **kwargs):
-        """Perform data analysis
+        """Perform data spectral analysis
 
         Args:
-            data (np.array): Input data for analysis
-            fs (float): Sampling frequency
-            n_pts (int, optional): Number of points in the FFT analysis. Defaults to 1024.
-            n_overlap (int, optional): Number of samples to overlap when splitting data into
+            - data (np.array): Input data for analysis.
+            - fs (float): Sampling frequency.
+            - n_pts (int, optional): Number of points in the FFT analysis. Defaults to 1024.
+            - n_overlap (int, optional): Number of samples to overlap when splitting data into
                 windows. Defaults to 0.
-            decimation_rate (int, optional): _description_. Defaults to 1.
-            n_mels (int, optional): Number of Mel points, applicable only in Mel analysis.
+            - decimation_rate (int, optional): Decimation rate for downsampling the data.
+                Defaults to 1.
+            - n_mels (int, optional): Number of Mel points, applicable only in Mel analysis.
                 Defaults to 256.
 
         Returns:
@@ -39,11 +41,12 @@ class Analysis(enum.Enum):
                 - 2D array representing power spectrum.
                 - 1D array with output frequencies.
                 - 1D array with relative time to sample 0 of the data.
+
         """
         return globals()[str(self)](*args, **kwargs)
 
 class Normalization(enum.Enum):
-    """ Enum class to represent the normalizations available in this module """
+    """ Enum class representing the available normalizations in this module. """
     MIN_MAX = 0
     MIN_MAX_ZERO_CENTERED = 1
     NORM_L1 = 2
