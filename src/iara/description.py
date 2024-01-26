@@ -174,6 +174,7 @@ class DatasetTarget(DatasetFilter):
         super().__init__(column, values)
         self.include_others = include_others
 
+
 class CustomDataset:
     """Class representing a training dataset."""
 

@@ -21,7 +21,7 @@ def main():
     )
 
     print(dp.get_data(dataset_id=100))
-    print(dp.get_training_data(dataset_ids=range(5,10), targets=[2, 2, 1, 1, 1]))
+    print(dp.get_training_df(dataset_ids=range(5,10), targets=[2, 2, 1, 1, 1]))
 
 if __name__ == "__main__":
     main()

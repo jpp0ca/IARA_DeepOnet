@@ -22,6 +22,9 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as color
 import tikzplotlib as tikz
 
+import torch
+import torch.utils.data as torch_data
+
 import iara.processing.analysis as iara_proc
 import iara.processing.prefered_number as iara_pn
 
@@ -98,11 +101,9 @@ class DatasetProcessor():
         self.extract_id = extract_id
         self.input_type = input_type
         self.frequency_limit = frequency_limit
-        self.load_data = {}
 
         self.data_processed_dir = os.path.join(self.data_processed_base_dir,
                                   str(self.analysis) + "_" + str(self.input_type))
-        os.makedirs(self.data_processed_dir, exist_ok=True)
 
     def _find_raw_file(self, dataset_id: int) -> str:
         """
@@ -150,27 +151,6 @@ class DatasetProcessor():
 
         return power, freqs, times
 
-    def __load(self, dataset_id: int):
-
-        if self.input_type == InputType.WINDOW:
-
-            dataset_file = os.path.join(self.data_processed_dir, f'{dataset_id}.pkl')
-
-            if os.path.exists(dataset_file):
-                self.load_data[dataset_id] = pd.read_pickle(dataset_file)
-                return
-
-            power, freqs, _ = self._process(dataset_id)
-
-            columns = [f'f {i}' for i in range(len(freqs))]
-            df = pd.DataFrame(power.T, columns=columns)
-            df.to_pickle(dataset_file)
-
-            self.load_data[dataset_id] = df
-
-        else:
-            raise NotImplementedError(f'input type {str(self.input_type)} not implemented')
-
     def get_data(self, dataset_id: int) -> pd.DataFrame:
         """
         Get data for the given ID.
@@ -181,12 +161,26 @@ class DatasetProcessor():
         Returns:
             pd.DataFrame: The DataFrame containing the processed data.
         """
-        if not dataset_id in self.load_data:
-            self.__load(dataset_id)
+        if self.input_type == InputType.WINDOW:
 
-        return self.load_data[dataset_id]
+            os.makedirs(self.data_processed_dir, exist_ok=True)
+            dataset_file = os.path.join(self.data_processed_dir, f'{dataset_id}.pkl')
 
-    def get_training_data(self,
+            if os.path.exists(dataset_file):
+                return pd.read_pickle(dataset_file)
+
+            power, freqs, _ = self._process(dataset_id)
+
+            columns = [f'f {i}' for i in range(len(freqs))]
+            df = pd.DataFrame(power.T, columns=columns)
+            df.to_pickle(dataset_file)
+
+            return df
+
+        else:
+            raise NotImplementedError(f'input type {str(self.input_type)} not implemented')
+
+    def get_training_df(self,
                           dataset_ids: typing.Iterable[int],
                           targets: typing.Iterable) -> typing.Tuple[pd.DataFrame, pd.Series]:
         """
@@ -216,6 +210,23 @@ class DatasetProcessor():
             result_target = pd.concat([result_target, replicated_targets], ignore_index=True)
 
         return result_df, result_target
+
+    def get_training_pytorch_datasets(self,
+                                      dataset_ids: typing.Iterable[int],
+                                      targets: typing.Iterable) -> 'TorchDataset':
+        """
+        Retrieve data for the given dataset IDs.
+
+        Parameters:
+            - dataset_ids (Iterable[int]): The list of IDs to fetch data for;
+                a pd.Series of ints can be passed as well.
+            - targets (Iterable): List of target values corresponding to the dataset IDs.
+                Should have the same number of elements as dataset_ids.
+
+        Returns:
+            TorchDataset: torch.utils.data.Dataset to use in a DataLoader.
+        """
+        return TorchDataset(self, dataset_ids, targets)
 
     def plot(self,
              dataset_id: typing.Union[int, typing.Iterable[int]],
@@ -317,3 +328,80 @@ class DatasetProcessor():
         elif plot_type == PlotType.EXPORT_TEX:
             tikz.save(filename)
             plt.close()
+
+
+class TorchDataset(torch_data.Dataset):
+    """Custom dataset abstraction to bridge between torch.utils.data.Dataset and
+        pandas.DataFrame/pandas.Series.
+
+    This class facilitates the integration of PyTorch's DataLoader with data in the form of a
+        pandas.DataFrame and pandas.Series.
+
+    The MEMORY_LIMIT attribute specifies the maximum size (in bytes) of a dataframe that can be
+    loaded into memory. When a dataset exceeds this limit, the data is loaded partially as needed.
+    While this approach is less efficient, it reduces the likelihood of the dataset being closed
+    by the operating system due to memory constraints.
+    """
+    MEMORY_LIMIT = 2 * 1024 * 1024 * 1024  # 2 gigabytes
+
+    def __init__(self,
+                 dataset_processor: DatasetProcessor,
+                 dataset_ids: typing.Iterable[int],
+                 targets: typing.Iterable) -> None:
+        """
+        Args:
+            - data (pd.DataFrame): Input data.
+            - target (pd.Series): Target corresponding to the input data.
+        """
+        self.dataset_processor = dataset_processor
+        self.complete_data = pd.DataFrame()
+        self.targets = pd.Series()
+        self.dataset_ids = dataset_ids.values
+        self.limit_ids = [0]
+        self.last_id = -1
+        self.data = []
+
+        total_memory = 0
+        for dataset_id, target in tqdm.tqdm(list(zip(dataset_ids, targets)),
+                                            desc='Loading dataset', leave=False):
+            data_df = self.dataset_processor.get_data(dataset_id)
+            self.limit_ids.append(self.limit_ids[-1] + len(data_df))
+
+            replicated_targets = pd.Series([target] * len(data_df), name='Target')
+            self.targets = pd.concat([self.targets, replicated_targets], ignore_index=True)
+
+            total_memory += data_df.memory_usage(deep=True).sum()
+
+            if total_memory > TorchDataset.MEMORY_LIMIT:
+                self.complete_data = None
+            else:
+                self.complete_data = pd.concat([self.complete_data, data_df], ignore_index=True)
+
+        ## Uncomment to print total memory needed by keeping a dataset in memory
+        # unity = ['B', 'KB', 'MB', 'GB', 'TB']
+        # cont = 0
+        # while total_memory > 1024:
+        #     total_memory /= 1024
+        #     cont += 1
+        # print('total_memory: ', total_memory, unity[cont])
+
+        self.targets = torch.tensor(self.targets.values, dtype=torch.int64)
+
+        if self.complete_data is not None:
+            self.complete_data = torch.tensor(self.complete_data.values, dtype=torch.float32)
+
+    def __len__(self):
+        return self.limit_ids[-1]
+
+    def __getitem__(self, index) -> typing.Tuple[torch.Tensor, torch.Tensor]:
+        if self.complete_data is not None:
+            return self.complete_data[index], self.targets[index]
+
+        current_id = next(i for i, valor in enumerate(self.limit_ids) if valor > index) - 1
+
+        if current_id != self.last_id:
+            self.last_id = current_id
+            self.data = self.dataset_processor.get_data(self.dataset_ids[current_id])
+            self.data = torch.tensor(self.data.values, dtype=torch.float32)
+
+        return self.data[index - self.limit_ids[current_id]], self.targets[index]
