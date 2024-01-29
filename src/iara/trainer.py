@@ -13,6 +13,7 @@ import abc
 import tqdm
 import numpy as np
 import pandas as pd
+import pickle
 import jsonpickle
 import matplotlib.pyplot as plt
 
@@ -408,6 +409,15 @@ class NNTrainer(OneShotTrainerInterface):
 
         container = self._prepare_for_training(trn_dataset=trn_dataset).items()
 
+        partial_trn_model = self._model_name(model_base_dir=model_base_dir,
+                                             complement='partial',
+                                             extention='pkl')
+        if os.path.exists(partial_trn_model):
+            with open(partial_trn_model, 'rb') as f:
+                partial_trn = pickle.load(f)
+        else:
+            partial_trn = None
+
         for target_id, (model, optimizer, loss_module) in container if (len(container) == 1) else \
                     tqdm.tqdm(container, leave=False, desc="Classes"):
 
@@ -434,8 +444,30 @@ class NNTrainer(OneShotTrainerInterface):
             trn_batch_loss = []
             val_batch_loss = []
             n_epochs = 0
-            for _ in tqdm.tqdm(range(self.n_epochs), leave=False, desc="Epochs"):
+
+            if partial_trn is not None:
+                if partial_trn['target_id'] > target_id:
+                    continue
+
+                if partial_trn['target_id'] == target_id:
+                    model = partial_trn['model']
+                    optimizer = partial_trn['optimizer']
+                    loss_module = partial_trn['loss_module']
+                    start_epochs = partial_trn['epoch'] + 1
+                    trn_epoch_loss = partial_trn['trn_epoch_loss']
+                    val_epoch_loss = partial_trn['val_epoch_loss']
+                    trn_batch_loss = partial_trn['trn_batch_loss']
+                    val_batch_loss = partial_trn['val_batch_loss']
+                    best_val_loss = partial_trn['best_val_loss']
+                    epochs_without_improvement = partial_trn['epochs_without_improvement']
+                    best_model_state_dict = partial_trn['best_model_state_dict']
+
+            for i_epoch in tqdm.tqdm(range(self.n_epochs), leave=False, desc="Epochs"):
                 n_epochs += 1
+
+                if partial_trn is not None:
+                    if partial_trn['epoch'] >= i_epoch:
+                        continue
 
                 running_loss = []
                 for samples, targets in tqdm.tqdm(trn_loader,
@@ -495,33 +527,56 @@ class NNTrainer(OneShotTrainerInterface):
                 if self.patience is not None and epochs_without_improvement >= self.patience:
                     break
 
+                state = {
+                    'target_id': target_id,
+                    'model': model,
+                    'optimizer': optimizer,
+                    'loss_module': loss_module,
+                    'epoch': i_epoch,
+                    'trn_epoch_loss': trn_epoch_loss,
+                    'val_epoch_loss': val_epoch_loss,
+                    'trn_batch_loss': trn_batch_loss,
+                    'val_batch_loss': val_batch_loss,
+                    'best_val_loss': best_val_loss,
+                    'epochs_without_improvement': epochs_without_improvement,
+                    'best_model_state_dict': best_model_state_dict,
+                }
+                with open(partial_trn_model, 'wb') as f:
+                    pickle.dump(state, f)
+
+                trn_batch_loss_arr, val_batch_loss_arr = np.array(trn_batch_loss), np.array(val_batch_loss)
+
+                trn_batches = np.linspace(start=1, stop=n_epochs, num=len(trn_batch_loss_arr))
+                val_batches = np.linspace(start=1, stop=n_epochs, num=len(val_batch_loss_arr))
+
+                plt.figure(figsize=(10, 5))
+                plt.plot(trn_batches, trn_batch_loss_arr, label='Training Loss')
+                plt.plot(val_batches, val_batch_loss_arr, label='Validation Loss')
+                plt.xlabel('Epoch')
+                plt.ylabel('Loss')
+                plt.title('Training and Validation Loss')
+                plt.legend()
+                plt.savefig(batch_error_filename)
+
+                trn_batches = np.linspace(start=1, stop=n_epochs, num=len(trn_epoch_loss))
+                val_batches = np.linspace(start=1, stop=n_epochs, num=len(val_epoch_loss))
+
+                plt.figure(figsize=(10, 5))
+                plt.plot(trn_batches, trn_epoch_loss, label='Training Loss')
+                plt.plot(val_batches, val_epoch_loss, label='Validation Loss')
+                plt.xlabel('Epoch')
+                plt.ylabel('Loss')
+                plt.title('Training and Validation Loss')
+                plt.legend()
+                plt.savefig(epoch_error_filename)
+
             if best_model_state_dict:
                 model.load_state_dict(best_model_state_dict)
 
-            trn_batch_loss, val_batch_loss = np.array(trn_batch_loss), np.array(val_batch_loss)
-
-            trn_batches = np.linspace(start=1, stop=n_epochs, num=len(trn_batch_loss))
-            val_batches = np.linspace(start=1, stop=n_epochs, num=len(val_batch_loss))
-
-            plt.figure(figsize=(10, 5))
-            plt.plot(trn_batches, trn_batch_loss, label='Training Loss')
-            plt.plot(val_batches, val_batch_loss, label='Validation Loss')
-            plt.xlabel('Epoch')
-            plt.ylabel('Loss')
-            plt.title('Training and Validation Loss')
-            plt.legend()
-            plt.savefig(batch_error_filename)
-
-            plt.figure(figsize=(10, 5))
-            plt.plot(trn_epoch_loss, label='Training Loss')
-            plt.plot(val_epoch_loss, label='Validation Loss')
-            plt.xlabel('Epoch')
-            plt.ylabel('Loss')
-            plt.title('Training and Validation Loss')
-            plt.legend()
-            plt.savefig(epoch_error_filename)
-
             model.save(model_filename)
+
+        if os.path.exists(partial_trn_model):
+            os.remove(partial_trn_model)
 
     def is_trained(self, model_base_dir: str) -> bool:
         """
