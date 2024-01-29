@@ -14,7 +14,7 @@ import iara.processing.analysis as iara_proc
 import iara.processing.dataset as iara_data_proc
 
 
-def main(override: bool = False, only_first_fold = True):
+def main(override: bool = False, only_first_fold = False):
     """Main function for the test Training Configuration."""
 
     config_dir = "./results/configs"
