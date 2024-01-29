@@ -76,6 +76,8 @@ def main(override: bool = False, only_first_fold = True):
 
     multiclass_trainer = iara_trn.NNTrainer(
                                 training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                trainer_id = 'MLP',
+                                n_targets = config.dataset.target.get_n_targets(),
                                 model_allocator=lambda input_shape:
                                             iara_model.MLP(input_shape=input_shape,
                                                            n_neurons=128,
@@ -85,6 +87,8 @@ def main(override: bool = False, only_first_fold = True):
 
     specialist_trainer = iara_trn.NNTrainer(
                                 training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+                                trainer_id = 'MLP',
+                                n_targets = config.dataset.target.get_n_targets(),
                                 model_allocator=lambda input_shape:
                                             iara_model.MLP(input_shape=input_shape,
                                                            n_neurons=32),

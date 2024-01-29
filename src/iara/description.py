@@ -174,6 +174,10 @@ class DatasetTarget(DatasetFilter):
         super().__init__(column, values)
         self.include_others = include_others
 
+    def get_n_targets(self) -> int:
+        """Return the number os targets."""
+        return len(self.values) + (1 if self.include_others else 0)
+
 
 class CustomDataset:
     """Class representing a training dataset."""

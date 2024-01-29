@@ -16,10 +16,12 @@ def main():
     dropout = 0.2
 
     transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))])
-    train_dataset = datasets.MNIST(root="./data", train=True, transform=transform, download=True)
+    trn_dataset = datasets.MNIST(root="./data", train=True, transform=transform, download=True)
     val_dataset = datasets.MNIST(root="./data", train=False, transform=transform, download=True)
 
     trn_multiclass = iara_trn.NNTrainer(training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                trainer_id = 'MLP',
+                                n_targets = 10,
                                 model_allocator=lambda input_shape:
                                             iara_model.MLP(input_shape=input_shape,
                                                            n_neurons=n_neurons,
@@ -28,12 +30,14 @@ def main():
                                 batch_size = 64,
                                 n_epochs = 5)
 
-    trn_multiclass.fit(output_base_dir=output_dir,
-                       train_dataset=train_dataset,
-                       validation_dataset=val_dataset)
+    trn_multiclass.fit(model_base_dir=output_dir,
+                       trn_dataset=trn_dataset,
+                       val_dataset=val_dataset)
 
     trn_specialist = iara_trn.NNTrainer(
                                 training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+                                trainer_id = 'MLP',
+                                n_targets = 10,
                                 model_allocator=lambda input_shape:
                                             iara_model.MLP(input_shape=input_shape,
                                                            n_neurons=n_neurons,
@@ -41,9 +45,9 @@ def main():
                                 batch_size = 64,
                                 n_epochs = 5)
 
-    trn_specialist.fit(output_base_dir=output_dir,
-                       train_dataset=train_dataset,
-                       validation_dataset=val_dataset)
+    trn_specialist.fit(model_base_dir=output_dir,
+                       trn_dataset=trn_dataset,
+                       val_dataset=val_dataset)
 
 
 if __name__ == "__main__":
