@@ -5,6 +5,7 @@ This script generates a sample training configuration for testing functionality.
 In the future, this test script will be part of an application designed to create training
     configurations as described in the associated article.
 """
+import argparse
 import tqdm
 
 import iara.description
@@ -14,7 +15,7 @@ import iara.processing.analysis as iara_proc
 import iara.processing.dataset as iara_data_proc
 
 
-def main(override: bool = False, only_first_fold = False):
+def main(override: bool, only_first_fold: bool, only_sample: bool):
     """Main function for the test Training Configuration."""
 
     config_dir = "./results/configs"
@@ -36,7 +37,7 @@ def main(override: bool = False, only_first_fold = False):
                             values = ['Cargo', 'Tanker', 'Tug'], # , 'Passenger'
                             include_others = True
                         ),
-                        only_sample=True
+                        only_sample=only_sample
                     )
         # dataset = iara.description.CustomDataset(
         #                 dataset_type = iara.description.DatasetType.OS_CPA_IN,
@@ -104,4 +105,13 @@ def main(override: bool = False, only_first_fold = False):
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description='RUN Training test')
+    parser.add_argument('--override', action='store_true', default=False,
+                        help='Ignore old runs')
+    parser.add_argument('--only_first_fold', action='store_true', default=False,
+                        help='Execute only first fold. For inspection purpose')
+    parser.add_argument('--only_sample', action='store_true', default=False,
+                        help='Execute only in sample_dataset. For quick training and test.')
+
+    args = parser.parse_args()
+    main(args.override, args.only_first_fold, args.only_sample)

@@ -129,10 +129,12 @@ class TrainingStrategy(enum.Enum):
             torch.nn.Module: The torch loss function module.
         """
         if self == TrainingStrategy.CLASS_SPECIALIST:
-            return torch.nn.BCELoss(weight=class_weights[1]/class_weights[0])
+            return torch.nn.BCELoss(weight=class_weights[1]/class_weights[0],
+                                    reduction='mean')
 
         if self == TrainingStrategy.MULTICLASS:
-            return torch.nn.CrossEntropyLoss(weight=class_weights)
+            return torch.nn.CrossEntropyLoss(weight=class_weights,
+                                             reduction='mean')
 
         raise NotImplementedError('TrainingStrategy has not default_loss implemented')
 
@@ -274,7 +276,7 @@ class NNTrainer(OneShotTrainerInterface):
                  model_allocator: typing.Callable[[typing.List[int]],iara_model.BaseModel],
                  batch_size: int = 64,
                  n_epochs: int = 128,
-                 patience: int = None,
+                 patience: int = 10,
                  optimizer_allocator: typing.Callable[[iara_model.BaseModel],
                                                       torch.optim.Optimizer]=None,
                  loss_allocator: typing.Callable[[torch.Tensor], torch.nn.Module]=None,
@@ -289,7 +291,8 @@ class NNTrainer(OneShotTrainerInterface):
                 A callable that allocates the model with the given architecture.
             batch_size (int, optional): The batch size for training. Defaults to 64.
             n_epochs (int, optional): The number of epochs for training. Defaults to 128.
-            patience (int, optional): The patience for early stopping. Defaults to None.
+            patience (int, optional): The patience for early stopping. None to execute all epochs.
+                Default 10.
             optimizer_allocator (typing.Optional[typing.Callable[[iara_model.BaseModel],
                 torch.optim.Optimizer]], optional): A callable that allocates the optimizer for
                 the model. If provided, this callable will be used to allocate the optimizer.
@@ -401,6 +404,8 @@ class NNTrainer(OneShotTrainerInterface):
                                                 batch_size=self.batch_size,
                                                 shuffle=True)
 
+        trn_n_batchs, val_n_batchs = len(trn_dataset), len(val_dataset)
+
         container = self._prepare_for_training(trn_dataset=trn_dataset).items()
 
         for target_id, (model, optimizer, loss_module) in container if (len(container) == 1) else \
@@ -408,9 +413,13 @@ class NNTrainer(OneShotTrainerInterface):
 
             model_filename = self._model_name(model_base_dir=model_base_dir,
                                               target_id=target_id)
-            trn_error_filename = self._model_name(model_base_dir=model_base_dir,
+            batch_error_filename = self._model_name(model_base_dir=model_base_dir,
                                                   target_id=target_id,
-                                                  complement='trn',
+                                                  complement='trn_batch',
+                                                  extention='png')
+            epoch_error_filename = self._model_name(model_base_dir=model_base_dir,
+                                                  target_id=target_id,
+                                                  complement='trn_epochs',
                                                   extention='png')
 
             if os.path.exists(model_filename):
@@ -420,12 +429,15 @@ class NNTrainer(OneShotTrainerInterface):
             epochs_without_improvement = 0
             best_model_state_dict = None
 
-            trn_loss = []
-            val_loss = []
+            trn_epoch_loss = []
+            val_epoch_loss = []
+            trn_batch_loss = []
+            val_batch_loss = []
             n_epochs = 0
             for _ in tqdm.tqdm(range(self.n_epochs), leave=False, desc="Epochs"):
                 n_epochs += 1
 
+                running_loss = []
                 for samples, targets in tqdm.tqdm(trn_loader,
                                                   leave=False,
                                                   desc="Training Batchs"):
@@ -443,11 +455,14 @@ class NNTrainer(OneShotTrainerInterface):
 
                     loss = loss_module(predictions, targets)
                     loss.backward()
-                    trn_loss.append(loss.item())
+                    trn_batch_loss.append(loss.item())
+                    running_loss.append(loss.item())
 
                     optimizer.step()
 
-                running_loss = 0.0
+                trn_epoch_loss.append(np.mean(running_loss))
+
+                running_loss = []
                 with torch.no_grad():
                     for samples, targets in tqdm.tqdm(val_loader,
                                                       leave=False,
@@ -463,8 +478,12 @@ class NNTrainer(OneShotTrainerInterface):
                         predictions = model(samples)
 
                         loss = loss_module(predictions, targets)
-                        running_loss += loss.item()
-                        val_loss.append(loss.item())
+                        running_loss.append(loss.item())
+                        val_batch_loss.append(loss.item())
+
+                    val_epoch_loss.append(np.mean(running_loss))
+
+                running_loss = np.mean(running_loss)
 
                 if running_loss < best_val_loss:
                     best_val_loss = running_loss
@@ -479,19 +498,28 @@ class NNTrainer(OneShotTrainerInterface):
             if best_model_state_dict:
                 model.load_state_dict(best_model_state_dict)
 
-            trn_loss, val_loss = np.array(trn_loss), np.array(val_loss)
+            trn_batch_loss, val_batch_loss = np.array(trn_batch_loss), np.array(val_batch_loss)
 
-            trn_batches = np.linspace(start=1, stop=n_epochs, num=len(trn_loss))
-            val_batches = np.linspace(start=1, stop=n_epochs, num=len(val_loss))
+            trn_batches = np.linspace(start=1, stop=n_epochs, num=len(trn_batch_loss))
+            val_batches = np.linspace(start=1, stop=n_epochs, num=len(val_batch_loss))
 
             plt.figure(figsize=(10, 5))
-            plt.plot(trn_batches, trn_loss, label='Training Loss')
-            plt.plot(val_batches, val_loss, label='Validation Loss')
+            plt.plot(trn_batches, trn_batch_loss, label='Training Loss')
+            plt.plot(val_batches, val_batch_loss, label='Validation Loss')
             plt.xlabel('Epoch')
             plt.ylabel('Loss')
             plt.title('Training and Validation Loss')
             plt.legend()
-            plt.savefig(trn_error_filename)
+            plt.savefig(batch_error_filename)
+
+            plt.figure(figsize=(10, 5))
+            plt.plot(trn_epoch_loss, label='Training Loss')
+            plt.plot(val_epoch_loss, label='Validation Loss')
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.title('Training and Validation Loss')
+            plt.legend()
+            plt.savefig(epoch_error_filename)
 
             model.save(model_filename)
 
@@ -699,12 +727,18 @@ class Trainer():
             val_dataset_ids (typing.Iterable[int]): Iterable of validation dataset IDs.
             val_targets (typing.Iterable): Iterable of validation targets.
         """
+        iara.utils.set_seed()
+
         model_base_dir = os.path.join(self.config.output_base_dir,
                                         'model',
                                         f'{i_fold}_of_{self.config.n_folds}')
 
         if self.is_trained(model_base_dir):
             return
+
+        # os.makedirs(model_base_dir, exist_ok=True)
+        # merged_df = pd.concat([trn_dataset_ids, trn_targets], axis=1)
+        # merged_df.to_csv(os.path.join(model_base_dir, 'merged_df.csv'), index=False)
 
         trn_dataset = iara_data_proc.TorchDataset(self.config.dataset_processor,
                                                     trn_dataset_ids,
@@ -811,10 +845,10 @@ class Trainer():
         _, trn_val_set_list = self.config.get_split_datasets()
 
         for _ in tqdm.tqdm(range(1), leave=False, desc="Fitting models", bar_format = "{desc}"):
-            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list) if only_first_fold else \
-                                    tqdm.tqdm(enumerate(trn_val_set_list),
+            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if only_first_fold else \
+                                    tqdm.tqdm(trn_val_set_list,
                                               leave=False,
-                                              desc="Fold"):
+                                              desc="Fold")):
 
                 self.fit(i_fold=i_fold,
                         trn_dataset_ids=trn_set['ID'],
@@ -826,10 +860,10 @@ class Trainer():
                     break
 
         for _ in tqdm.tqdm(range(1), leave=False, desc="Evaluating models", bar_format = "{desc}"):
-            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list) if only_first_fold else \
-                                    tqdm.tqdm(enumerate(trn_val_set_list),
+            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if only_first_fold else \
+                                    tqdm.tqdm(trn_val_set_list,
                                               leave=False,
-                                              desc="Fold"):
+                                              desc="Fold")):
 
                 self.eval(i_fold=i_fold,
                           dataset_id='val',
