@@ -1,16 +1,3 @@
-"""
-Script for analyzing the impact of Closest Point of Approach (CPA) on classification.
-
-This script generates two tests:
-
-1. Impact of the closest point for CPA:
-   - Classifier trained on OS_NEAR_CPA_IN data and evaluated on OS_FAR_CPA_IN data.
-   - Classifier trained on OS_FAR_CPA_IN data and evaluated on OS_NEAR_CPA_IN data.
-
-2. Impact of records containing CPA:
-   - Classifier trained on OS_CPA_IN data and evaluated on OS_CPA_OUT data.
-   - Classifier trained on OS_CPA_OUT data and evaluated on OS_CPA_IN data.
-"""
 import argparse
 import tqdm
 
@@ -22,18 +9,15 @@ import iara.processing.dataset as iara_data_proc
 
 
 def main(override: bool, only_first_fold: bool, only_sample: bool):
-    """Main function for the CPA analysis script."""
 
     config_dir = "./results/configs"
 
     configs = {
-        'near_cpa': iara.description.DatasetType.OS_NEAR_CPA_IN,
-        'far_cpa': iara.description.DatasetType.OS_FAR_CPA_IN,
-        'cpa_in': iara.description.DatasetType.OS_CPA_IN,
-        'cpa_out': iara.description.DatasetType.OS_CPA_OUT
+        'grid_search': iara.description.DatasetType.OS_SHIP
     }
 
-    for config_name, data_type in tqdm.tqdm(configs.items(), leave=False, desc="Configs"):
+    # for config_name, data_type in tqdm.tqdm(configs.items(), leave=False, desc="Configs"):
+    for config_name, data_type in configs.items():
 
         config = False
         if not override:
@@ -71,42 +55,44 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
                             name = config_name,
                             dataset = dataset,
                             dataset_processor = dp,
-                            output_base_dir = "./results/trainings/cpa_analysis_sample",
-                            n_folds=10 if not only_sample else 3,
-                            test_factor=0.2)
+                            output_base_dir = "./results/trainings",
+                            n_folds=5 if not only_sample else 3)
 
             config.save(config_dir)
 
-        mlp_trainer = iara_trn.NNTrainer(
+        mlp_trainers = []
+        for n_neurons in [4, 16, 64]:
+            mlp_trainers.append(iara_trn.NNTrainer(
                                     training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
-                                    trainer_id = 'MLP',
+                                    trainer_id = f'MLP_{n_neurons}',
                                     n_targets = config.dataset.target.get_n_targets(),
                                     model_allocator=lambda input_shape:
                                                 iara_model.MLP(input_shape=input_shape,
-                                                        n_neurons=64,
-                                                        n_targets=dataset.target.get_n_targets()),
+                                                            n_neurons=n_neurons,
+                                                            n_targets=dataset.target.get_n_targets()),
                                     batch_size = 128,
-                                    n_epochs = 256,
-                                    patience=None)
+                                    n_epochs = 64,
+                                    patience=8))
 
-        # mlp_trainer = iara_trn.NNTrainer(
+        # for n_neurons in [4, 16, 64]:
+        #     mlp_trainers.append(iara_trn.NNTrainer(
         #                             training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
-        #                             trainer_id = 'MLP',
+        #                             trainer_id = f'MLP_{n_neurons}',
         #                             n_targets = config.dataset.target.get_n_targets(),
         #                             model_allocator=lambda input_shape:
         #                                         iara_model.MLP(input_shape=input_shape,
-        #                                                 n_neurons=64),
+        #                                                     n_neurons=n_neurons),
         #                             batch_size = 128,
-        #                             n_epochs = 256,
-        #                             patience=None)
+        #                             n_epochs = 64,
+        #                             patience=8))
 
-        trainer = iara_trn.Trainer(config=config, trainer_list=[mlp_trainer])
+        trainer = iara_trn.Trainer(config=config, trainer_list=mlp_trainers)
 
         trainer.run(only_first_fold = only_first_fold)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='RUN CPA analysis')
+    parser = argparse.ArgumentParser(description='RUN grid search analysis')
     parser.add_argument('--override', action='store_true', default=False,
                         help='Ignore old runs')
     parser.add_argument('--only_first_fold', action='store_true', default=False,

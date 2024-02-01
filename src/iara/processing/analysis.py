@@ -43,7 +43,28 @@ class SpectralAnalysis(enum.Enum):
                 - 1D array with relative time to sample 0 of the data.
 
         """
-        return globals()[str(self)](*args, **kwargs)
+        power, freq, time = globals()[str(self)](*args, **kwargs)
+
+        fs = kwargs['fs']
+        integration_overlap = kwargs.get('integration_overlap', 0)
+        integration_interval = kwargs.get('integration_interval', None)
+
+        if integration_interval is None:
+            return power, freq, time
+
+        delta_t = time[-1] - time[-2]
+        n_means = int(np.round(integration_interval / delta_t))
+        n_overlap = int(np.round((integration_interval-integration_overlap)/ delta_t))
+
+        final_power = []
+        final_times = []
+
+        for i in range(0, len(time), n_overlap):
+            mean_spectrum = np.mean(power[:, i:i+n_means], axis=1)
+            final_power.append(mean_spectrum)
+            final_times.append(time[i])
+
+        return np.array(final_power).T, freq, final_times
 
 class Normalization(enum.Enum):
     """ Enum class representing the available normalizations in this module. """

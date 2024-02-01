@@ -72,7 +72,9 @@ class DatasetProcessor():
                 decimation_rate: int = 1,
                 extract_id: typing.Callable[[str], int] = get_iara_id,
                 input_type: InputType = InputType.WINDOW,
-                frequency_limit: float = None
+                frequency_limit: float = None,
+                integration_overlap=0,
+                integration_interval=None
                 ) -> None:
         """
         Parameters:
@@ -101,6 +103,8 @@ class DatasetProcessor():
         self.extract_id = extract_id
         self.input_type = input_type
         self.frequency_limit = frequency_limit
+        self.integration_overlap = integration_overlap
+        self.integration_interval = integration_interval
 
         self.data_processed_dir = os.path.join(self.data_processed_base_dir,
                                   str(self.analysis) + "_" + str(self.input_type))
@@ -135,11 +139,13 @@ class DatasetProcessor():
             data = data[:,0]
 
         power, freqs, times = self.analysis.apply(data = data,
-                                                    fs = fs,
-                                                    n_pts = self.n_pts,
-                                                    n_overlap = self.n_overlap,
-                                                    n_mels = self.n_mels,
-                                                    decimation_rate = self.decimation_rate)
+                                                  fs = fs,
+                                                  n_pts = self.n_pts,
+                                                  n_overlap = self.n_overlap,
+                                                  n_mels = self.n_mels,
+                                                  decimation_rate = self.decimation_rate,
+                                                  integration_overlap = self.integration_overlap,
+                                                  integration_interval = self.integration_interval)
 
         power = self.normalization(power)
 
@@ -342,7 +348,7 @@ class TorchDataset(torch_data.Dataset):
     While this approach is less efficient, it reduces the likelihood of the dataset being closed
     by the operating system due to memory constraints.
     """
-    MEMORY_LIMIT = 2 * 1024 * 1024 * 1024  # 2 gigabytes
+    MEMORY_LIMIT = 2 * 1024 * 1024 * 1024  # gigabytes
 
     def __init__(self,
                  dataset_processor: DatasetProcessor,
@@ -377,7 +383,7 @@ class TorchDataset(torch_data.Dataset):
             else:
                 self.complete_data = pd.concat([self.complete_data, data_df], ignore_index=True)
 
-        ## Uncomment to print total memory needed by keeping a dataset in memory
+        # # Uncomment to print total memory needed by keeping a dataset in memory
         # unity = ['B', 'KB', 'MB', 'GB', 'TB']
         # cont = 0
         # while total_memory > 1024:

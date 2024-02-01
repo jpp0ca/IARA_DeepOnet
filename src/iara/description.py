@@ -132,6 +132,20 @@ class DatasetType(enum.Enum):
 
         return str(self.name).rsplit(".", maxsplit=1)[-1]
 
+    def get_prettier_str(self) -> str:
+        """ Get dataset type as string to print and tables. """
+        labels = [
+            "near cpa in",
+            "near cpa out",
+            "far cpa in",
+            "far cpa out",
+            "cpa in",
+            "cpa out",
+            "os ship",
+            "os bg",
+        ]
+        return labels[self.value]
+
     def info_to_df(self, only_sample: bool = False) -> pd.DataFrame:
         """Get information about the dataset
 

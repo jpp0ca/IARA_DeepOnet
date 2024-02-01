@@ -162,6 +162,8 @@ class TrainingStrategy(enum.Enum):
 
         raise NotImplementedError('TrainingStrategy has not default_loss implemented')
 
+    def __str__(self) -> str:
+        return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
 
 class OneShotTrainerInterface():
     """Interface defining methods that should be implemented by classes to serve as a trainer
@@ -317,6 +319,9 @@ class NNTrainer(OneShotTrainerInterface):
         self.loss_allocator = loss_allocator or self.training_strategy.default_loss
         self.device = device
 
+    def __str__(self) -> str:
+        return f'{self.trainer_id}_{str(self.training_strategy)}'
+
     def _prepare_for_training(self, trn_dataset: torch_data.Dataset) -> \
             typing.Dict[int,typing.Tuple[iara_model.BaseModel,
                                          torch.optim.Optimizer,
@@ -376,6 +381,24 @@ class NNTrainer(OneShotTrainerInterface):
             sufix = f"{sufix}_{complement}"
         return os.path.join(model_base_dir, f'{str(self.trainer_id)}_{sufix}.{extention}')
 
+    def _export_trn(self, trn_error, batch_error, n_epochs, filename, log_scale = False):
+
+        trn_batches = np.linspace(start=1, stop=n_epochs, num=len(trn_error))
+        val_batches = np.linspace(start=1, stop=n_epochs, num=len(batch_error))
+
+        plt.figure(figsize=(10, 5))
+        plt.plot(trn_batches, trn_error, label='Training Loss')
+        plt.plot(val_batches, batch_error, label='Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.title('Training and Validation Loss')
+        plt.tight_layout()
+        plt.legend()
+        if log_scale:
+            plt.semilogx()
+        plt.savefig(filename)
+        plt.close()
+
     def fit(self,
             model_base_dir: str,
             trn_dataset: torch_data.Dataset,
@@ -423,14 +446,6 @@ class NNTrainer(OneShotTrainerInterface):
 
             model_filename = self._model_name(model_base_dir=model_base_dir,
                                               target_id=target_id)
-            batch_error_filename = self._model_name(model_base_dir=model_base_dir,
-                                                  target_id=target_id,
-                                                  complement='trn_batch',
-                                                  extention='png')
-            epoch_error_filename = self._model_name(model_base_dir=model_base_dir,
-                                                  target_id=target_id,
-                                                  complement='trn_epochs',
-                                                  extention='png')
 
             if os.path.exists(model_filename):
                 continue
@@ -483,6 +498,7 @@ class NNTrainer(OneShotTrainerInterface):
 
                     targets = targets.to(self.device)
                     samples = samples.to(self.device)
+
                     predictions = model(samples)
 
                     loss = loss_module(predictions, targets)
@@ -546,29 +562,41 @@ class NNTrainer(OneShotTrainerInterface):
 
                 trn_batch_loss_arr, val_batch_loss_arr = np.array(trn_batch_loss), np.array(val_batch_loss)
 
-                trn_batches = np.linspace(start=1, stop=n_epochs, num=len(trn_batch_loss_arr))
-                val_batches = np.linspace(start=1, stop=n_epochs, num=len(val_batch_loss_arr))
+                batch_error_filename = self._model_name(model_base_dir=model_base_dir,
+                                                    target_id=target_id,
+                                                    complement='trn_batch',
+                                                    extention='png')
+                log_batch_error_filename = self._model_name(model_base_dir=model_base_dir,
+                                                    target_id=target_id,
+                                                    complement='trn_batch_log',
+                                                    extention='png')
+                epoch_error_filename = self._model_name(model_base_dir=model_base_dir,
+                                                    target_id=target_id,
+                                                    complement='trn_epochs',
+                                                    extention='png')
+                log_epoch_error_filename = self._model_name(model_base_dir=model_base_dir,
+                                                    target_id=target_id,
+                                                    complement='trn_epochs_log',
+                                                    extention='png')
 
-                plt.figure(figsize=(10, 5))
-                plt.plot(trn_batches, trn_batch_loss_arr, label='Training Loss')
-                plt.plot(val_batches, val_batch_loss_arr, label='Validation Loss')
-                plt.xlabel('Epoch')
-                plt.ylabel('Loss')
-                plt.title('Training and Validation Loss')
-                plt.legend()
-                plt.savefig(batch_error_filename)
+                self._export_trn(trn_error=trn_batch_loss_arr,
+                                 batch_error=val_batch_loss_arr,
+                                 n_epochs=n_epochs,
+                                 filename=batch_error_filename)
+                self._export_trn(trn_error=trn_batch_loss_arr,
+                                 batch_error=val_batch_loss_arr,
+                                 n_epochs=n_epochs,
+                                 filename=log_batch_error_filename,
+                                 log_scale=True)
+                self._export_trn(trn_error=trn_epoch_loss,
+                                 batch_error=val_epoch_loss,
+                                 n_epochs=n_epochs,
+                                 filename=epoch_error_filename)
+                self._export_trn(trn_epoch_loss, val_epoch_loss,
+                                 n_epochs,
+                                 log_epoch_error_filename,
+                                 log_scale=True)
 
-                trn_batches = np.linspace(start=1, stop=n_epochs, num=len(trn_epoch_loss))
-                val_batches = np.linspace(start=1, stop=n_epochs, num=len(val_epoch_loss))
-
-                plt.figure(figsize=(10, 5))
-                plt.plot(trn_batches, trn_epoch_loss, label='Training Loss')
-                plt.plot(val_batches, val_epoch_loss, label='Validation Loss')
-                plt.xlabel('Epoch')
-                plt.ylabel('Loss')
-                plt.title('Training and Validation Loss')
-                plt.legend()
-                plt.savefig(epoch_error_filename)
 
             if best_model_state_dict:
                 model.load_state_dict(best_model_state_dict)
@@ -929,6 +957,8 @@ class Trainer():
                     break
 
         for trainer in self.trainer_list:
+            print('Compiling results for ', trainer)
+
             results = self.compile_results(dataset_id='val',
                                           trainer=trainer,
                                           only_first_fold=only_first_fold)
