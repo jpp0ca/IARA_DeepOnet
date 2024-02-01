@@ -37,11 +37,11 @@ def main(override: bool):
     trn_multiclass = iara_trn.NNTrainer(training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
                                 trainer_id = 'MLP',
                                 n_targets = 10,
-                                model_allocator=lambda input_shape:
-                                            iara_model.MLP(input_shape=input_shape,
-                                                           n_neurons=n_neurons,
-                                                           n_targets=10,
-                                                           dropout=dropout),
+                                model_allocator=lambda input_shape, n_targets:
+                                        iara_model.MLP(input_shape=input_shape,
+                                            n_neurons=n_neurons,
+                                            n_targets=n_targets,
+                                            dropout=dropout),
                                 batch_size = 64,
                                 n_epochs = 5)
 
@@ -73,10 +73,10 @@ def main(override: bool):
                                 training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
                                 trainer_id = 'MLP',
                                 n_targets = 10,
-                                model_allocator=lambda input_shape:
-                                            iara_model.MLP(input_shape=input_shape,
-                                                           n_neurons=n_neurons,
-                                                           dropout=dropout),
+                                model_allocator=lambda input_shape, _:
+                                        iara_model.MLP(input_shape=input_shape,
+                                            n_neurons=n_neurons,
+                                            dropout=dropout),
                                 batch_size = 64,
                                 n_epochs = 5)
 

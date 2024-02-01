@@ -11,8 +11,6 @@ This script generates two tests:
    - Classifier trained on OS_CPA_IN data and evaluated on OS_CPA_OUT data.
    - Classifier trained on OS_CPA_OUT data and evaluated on OS_CPA_IN data.
 """
-import os
-import tqdm
 import argparse
 
 import iara.description
@@ -43,7 +41,7 @@ def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int
 
     config = False
     trainer_list = []
-    for config_name, data_type in tqdm.tqdm(configs.items(), leave=False, desc="Configs"):
+    for config_name, data_type in configs.items():
 
         config = False
         if not override:
@@ -105,9 +103,9 @@ def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int
         #                             training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
         #                             trainer_id = 'MLP',
         #                             n_targets = config.dataset.target.get_n_targets(),
-        #                             model_allocator=lambda input_shape:
-        #                                         iara_model.MLP(input_shape=input_shape,
-        #                                                 n_neurons=64),
+        #                             model_allocator=lambda input_shape, _:
+        #                                 iara_model.MLP(input_shape=input_shape,
+        #                                     n_neurons=64),
         #                             batch_size = 128,
         #                             n_epochs = 256,
         #                             patience=None)

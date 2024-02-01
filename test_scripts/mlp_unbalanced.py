@@ -4,9 +4,6 @@ Training MLP on an Unbalanced Dataset Test Program
 This script generates a sample training configuration for the MNIST dataset by unbalancing it and
 training a Multilayer Perceptron (MLP) for each iara.trainer.TrainingStrategy.
 """
-
-# Seu código aqui...
-
 import os
 import argparse
 import shutil
@@ -23,6 +20,7 @@ import iara.trainer as iara_trn
 
 
 class Dataset(torch_data.Dataset):
+    """Simple dataset to subset MNIST keeping interface for training."""
 
     def __init__(self, indexes, dataset) -> None:
         self.indexes = indexes
@@ -71,11 +69,11 @@ def main(override: bool):
     trn_multiclass = iara_trn.NNTrainer(training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
                                 trainer_id='MLP',
                                 n_targets=10,
-                                model_allocator=lambda input_shape:
-                                            iara_model.MLP(input_shape=input_shape,
-                                                           n_neurons=n_neurons,
-                                                           n_targets=10,
-                                                           dropout=dropout),
+                                model_allocator=lambda input_shape, n_targets:
+                                        iara_model.MLP(input_shape=input_shape,
+                                            n_neurons=n_neurons,
+                                            n_targets=n_targets,
+                                            dropout=dropout),
                                 batch_size=64,
                                 n_epochs=32,
                                 patience=5)
@@ -108,10 +106,9 @@ def main(override: bool):
                                 training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
                                 trainer_id='MLP',
                                 n_targets=10,
-                                model_allocator=lambda input_shape:
-                                            iara_model.MLP(input_shape=input_shape,
-                                                           n_neurons=n_neurons,
-                                                           dropout=dropout),
+                                model_allocator=lambda input_shape, _:
+                                        iara_model.MLP(input_shape=input_shape,
+                                            n_neurons=n_neurons),
                                 batch_size=64,
                                 n_epochs=5)
 

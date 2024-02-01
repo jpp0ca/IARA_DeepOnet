@@ -18,7 +18,6 @@ import pandas as pd
 import jsonpickle
 import matplotlib.pyplot as plt
 
-import sklearn.metrics as sk_metrics
 import sklearn.model_selection as sk_selection
 import sklearn.utils.class_weight as sk_utils
 
@@ -29,6 +28,7 @@ import iara.description
 import iara.processing.dataset as iara_data_proc
 import iara.ml.base_model as iara_model
 import iara.utils
+import iara.ml.metrics as iara_metrics
 
 
 class TrainingConfig:
@@ -960,37 +960,56 @@ class Trainer():
                 if only_first_fold:
                     break
 
+        grid = iara_metrics.GridCompiler()
+
         for trainer in self.trainer_list:
-            print('Compiling results for ', trainer)
+            # print('Compiling results for ', trainer)
 
             results = self.compile_results(dataset_id='val',
                                           trainer=trainer,
                                           only_first_fold=only_first_fold)
 
-            for result in results:
-                print('################ result ################')
-                accuracy = sk_metrics.accuracy_score(result['Target'],
-                                                    result['Prediction'])
-                print("Accuracy:", accuracy)
+            for i_fold, result in enumerate(results):
 
-                f1 = sk_metrics.f1_score(result['Target'],
-                                        result['Prediction'],
-                                        average='weighted')
-                print("F1-score:", f1)
+                grid.add(grid_id=str(trainer),
+                         i_fold=i_fold,
+                         target=result['Target'],
+                         prediction=result['Prediction'])
 
-                conf_matrix = sk_metrics.confusion_matrix(result['Target'],
-                                                        result['Prediction'])
-                print("Confusion Matrix:")
-                print(pd.DataFrame(conf_matrix))
-
+        print(f'\n______________{self.config.name}________________________')
+        print(grid.as_str())
+        print('----------------------------------------')
 
 class ModelComparator():
+    """
+    Class for comparing models based on cross-comparison in test datasets.
 
+    This class provides functionality to compare multiple models based on cross-comparison in test
+    datasets. It iterates through all combinations of two trainers from the provided list of
+    trainers, and evaluates each combination on the test dataset of the second trainer.
+    """
     def __init__(self, output_dir: str, trainer_list: typing.List[Trainer]) -> None:
+        """
+        Args:
+            output_dir (str): The directory path where evaluation results will be saved.
+            trainer_list (List[Trainer]): A list of Trainer objects containing the models to be
+                compared.
+        """
         self.output_dir = output_dir
         self.trainer_list = trainer_list
 
     def cross_compare_in_test(self, only_firs_fold: bool = False):
+        """
+        Perform cross-comparison of models on test datasets.
+
+        Iterates through all combinations of two trainers and evaluates each combination on the test
+        dataset of the second trainer.
+
+        Args:
+            only_firs_fold (bool, optional): If True, only evaluates the first fold of each trainer.
+                                             Defaults to False.
+        """
+        grid = iara_metrics.GridCompiler()
 
         for trainer_1, trainer_2 in itertools.permutations(self.trainer_list, 2):
 
@@ -1000,8 +1019,6 @@ class ModelComparator():
                                                 test_df1['ID'],
                                                 test_df1['Target'])
 
-            print(f'\n#### trained in({trainer_1}) -> evaluated in({trainer_2}) ####')
-
             for trainer in trainer_1.trainer_list:
 
                 for i_fold in range(trainer_1.config.n_folds):
@@ -1010,26 +1027,19 @@ class ModelComparator():
                                             f'{i_fold}_of_{trainer_1.config.n_folds}')
 
                     evaluation = trainer.eval(
-                            dataset_id=f'{trainer_2.config.name}_{str(trainer_1.config.name)}_{i_fold}',
-                            eval_base_dir = self.output_dir,
-                            model_base_dir = model_base_dir,
-                            dataset = dataset)
+                        dataset_id=f'{trainer_2.config.name}_{str(trainer_1.config.name)}_{i_fold}',
+                        eval_base_dir = self.output_dir,
+                        model_base_dir = model_base_dir,
+                        dataset = dataset)
 
-                    accuracy = sk_metrics.accuracy_score(evaluation['Target'],
-                                                        evaluation['Prediction'])
-                    print("Accuracy:", accuracy)
-
-                    f1 = sk_metrics.f1_score(evaluation['Target'],
-                                            evaluation['Prediction'],
-                                            average='weighted')
-                    print("F1-score:", f1)
-
-                    conf_matrix = sk_metrics.confusion_matrix(evaluation['Target'],
-                                                            evaluation['Prediction'])
-                    print("Confusion Matrix:")
-                    print(pd.DataFrame(conf_matrix))
+                    grid.add(grid_id=f'{trainer_1.config.name} -> {trainer_2.config.name}',
+                             i_fold=i_fold,
+                             target=evaluation['Target'],
+                             prediction=evaluation['Prediction'])
 
                     if only_firs_fold:
                         break
-            # test_df2, _ = trainer_2.config.get_split_datasets()
-            # print(test_df2)
+
+        print('\n______________Comparison________________________')
+        print(grid.as_str())
+        print('----------------------------------------')

@@ -79,10 +79,10 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
                                 training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
                                 trainer_id = 'MLP',
                                 n_targets = config.dataset.target.get_n_targets(),
-                                model_allocator=lambda input_shape:
-                                            iara_model.MLP(input_shape=input_shape,
-                                                           n_neurons=128,
-                                                           n_targets=4),
+                                model_allocator=lambda input_shape, n_targets:
+                                        iara_model.MLP(input_shape=input_shape,
+                                            n_neurons=128,
+                                            n_targets=n_targets),
                                 batch_size = 128,
                                 n_epochs = 5)
 
@@ -90,9 +90,9 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
                                 training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
                                 trainer_id = 'MLP',
                                 n_targets = config.dataset.target.get_n_targets(),
-                                model_allocator=lambda input_shape:
-                                            iara_model.MLP(input_shape=input_shape,
-                                                           n_neurons=32),
+                                model_allocator=lambda input_shape, n_targets:
+                                        iara_model.MLP(input_shape=input_shape,
+                                            n_neurons=128),
                                 batch_size = 128,
                                 n_epochs = 5)
 

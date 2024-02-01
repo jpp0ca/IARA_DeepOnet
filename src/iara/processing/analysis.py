@@ -45,7 +45,6 @@ class SpectralAnalysis(enum.Enum):
         """
         power, freq, time = globals()[str(self)](*args, **kwargs)
 
-        fs = kwargs['fs']
         integration_overlap = kwargs.get('integration_overlap', 0)
         integration_interval = kwargs.get('integration_interval', None)
 

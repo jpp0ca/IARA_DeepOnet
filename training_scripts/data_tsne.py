@@ -1,3 +1,8 @@
+"""
+Data Visualization Teste Program
+
+This script generate t-sne visualization for each dataset in iara.
+"""
 import os
 import argparse
 import shutil
@@ -5,13 +10,12 @@ import shutil
 import numpy as np
 
 import iara.description
-import iara.ml.mlp as iara_model
-import iara.trainer as iara_trn
 import iara.processing.analysis as iara_proc
 import iara.processing.dataset as iara_data_proc
 import iara.ml.visualization as iara_vis
 
 def main(override: bool, only_sample: bool):
+    """Main function for visualizing data using t-SNE."""
 
     output_dir = './results/plots/t-sne'
 
@@ -32,12 +36,12 @@ def main(override: bool, only_sample: bool):
         integration_interval=1.024
     )
 
-    for type in iara.description.DatasetType:
+    for dataset_type in iara.description.DatasetType:
     # for type in [iara.description.DatasetType.A]:
-        if type.value > iara.description.DatasetType.OS_SHIP.value:
+        if dataset_type.value > iara.description.DatasetType.OS_SHIP.value:
             break
 
-        filename=os.path.join(output_dir, f'{type.get_prettier_str()}.png')
+        filename=os.path.join(output_dir, f'{dataset_type.get_prettier_str()}.png')
 
         if os.path.exists(filename):
             continue
@@ -46,7 +50,7 @@ def main(override: bool, only_sample: bool):
 
 
         dataset = iara.description.CustomDataset(
-                        dataset_type = type,
+                        dataset_type = dataset_type,
                         target = iara.description.DatasetTarget(
                             column = 'TYPE',
                             values = values,
@@ -54,7 +58,7 @@ def main(override: bool, only_sample: bool):
                         ),
                         only_sample=only_sample
                     )
-        
+
         values.append('Others')
 
         df = dataset.get_dataset_info()

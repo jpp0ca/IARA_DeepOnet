@@ -1,5 +1,14 @@
+"""
+Grid Search Application
+
+This script performs an initial grid search to choose the MLP (Multi-Layer Perceptron) model
+configuration for all training in the article. It evaluates different configurations using
+cross-validation and selects the one with the best performance based on predefined evaluation
+metrics.
+
+The chosen configuration will then be used for further training and analysis in the article.
+"""
 import argparse
-import tqdm
 
 import iara.description
 import iara.ml.mlp as iara_model
@@ -9,6 +18,7 @@ import iara.processing.dataset as iara_data_proc
 
 
 def main(override: bool, only_first_fold: bool, only_sample: bool):
+    """Grid search main function"""
 
     config_dir = "./results/configs"
 
@@ -66,10 +76,10 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
                                     training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
                                     trainer_id = f'MLP_{n_neurons}',
                                     n_targets = config.dataset.target.get_n_targets(),
-                                    model_allocator=lambda input_shape:
-                                                iara_model.MLP(input_shape=input_shape,
-                                                            n_neurons=n_neurons,
-                                                            n_targets=dataset.target.get_n_targets()),
+                                    model_allocator=lambda input_shape, n_targets:
+                                        iara_model.MLP(input_shape=input_shape,
+                                            n_neurons=n_neurons,
+                                            n_targets=n_targets),
                                     batch_size = 128,
                                     n_epochs = 64,
                                     patience=8))
@@ -79,9 +89,9 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
         #                             training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
         #                             trainer_id = f'MLP_{n_neurons}',
         #                             n_targets = config.dataset.target.get_n_targets(),
-        #                             model_allocator=lambda input_shape:
-        #                                         iara_model.MLP(input_shape=input_shape,
-        #                                                     n_neurons=n_neurons),
+        #                             model_allocator=lambda input_shape, _:
+        #                                 iara_model.MLP(input_shape=input_shape,
+        #                                     n_neurons=n_neurons),
         #                             batch_size = 128,
         #                             n_epochs = 64,
         #                             patience=8))
