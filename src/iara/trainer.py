@@ -9,11 +9,12 @@ import typing
 import datetime
 import shutil
 import abc
+import pickle
+import itertools
 
 import tqdm
 import numpy as np
 import pandas as pd
-import pickle
 import jsonpickle
 import matplotlib.pyplot as plt
 
@@ -276,7 +277,7 @@ class NNTrainer(OneShotTrainerInterface):
                  training_strategy: TrainingStrategy,
                  trainer_id: str,
                  n_targets: int,
-                 model_allocator: typing.Callable[[typing.List[int]],iara_model.BaseModel],
+                 model_allocator: typing.Callable[[typing.List[int], int],iara_model.BaseModel],
                  batch_size: int = 64,
                  n_epochs: int = 128,
                  patience: int = 10,
@@ -290,7 +291,7 @@ class NNTrainer(OneShotTrainerInterface):
         Args:
             training_strategy (TrainingStrategy): The training strategy to be used.
             n_targets (int): Number of targets in the training.
-            model_allocator (typing.Callable[[typing.List[int]], iara_model.BaseModel]):
+            model_allocator (typing.Callable[[typing.List[int], int], iara_model.BaseModel]):
                 A callable that allocates the model with the given architecture.
             batch_size (int, optional): The batch size for training. Defaults to 64.
             n_epochs (int, optional): The number of epochs for training. Defaults to 128.
@@ -334,7 +335,7 @@ class NNTrainer(OneShotTrainerInterface):
             for target_id in range(self.n_targets):
                 class_weights = self._class_weight(trn_dataset, target_id).to(self.device)
 
-                model = self.model_allocator(input_shape).to(self.device)
+                model = self.model_allocator(input_shape, self.n_targets).to(self.device)
                 optimizer = self.optimizer_allocator(model)
                 loss = self.loss_allocator(class_weights)
                 trn_dict[target_id] = model, optimizer, loss
@@ -343,7 +344,7 @@ class NNTrainer(OneShotTrainerInterface):
         if self.training_strategy == TrainingStrategy.MULTICLASS:
             class_weights = self._class_weight(trn_dataset).to(self.device)
 
-            model = self.model_allocator(input_shape).to(self.device)
+            model = self.model_allocator(input_shape, self.n_targets).to(self.device)
             optimizer = self.optimizer_allocator(model)
             loss = self.loss_allocator(class_weights)
             trn_dict[-1] = model, optimizer, loss
@@ -360,7 +361,7 @@ class NNTrainer(OneShotTrainerInterface):
             raise UnboundLocalError(f'Targets in dataset not compatible with NNTrainer \
                                     configuration({self.n_targets})')
 
-    def _model_name(self,
+    def model_name(self,
                     model_base_dir: str,
                     target_id: typing.Optional[int] = None,
                     complement: str = None,
@@ -428,11 +429,9 @@ class NNTrainer(OneShotTrainerInterface):
                                                 batch_size=self.batch_size,
                                                 shuffle=True)
 
-        trn_n_batchs, val_n_batchs = len(trn_dataset), len(val_dataset)
-
         container = self._prepare_for_training(trn_dataset=trn_dataset).items()
 
-        partial_trn_model = self._model_name(model_base_dir=model_base_dir,
+        partial_trn_model = self.model_name(model_base_dir=model_base_dir,
                                              complement='partial',
                                              extention='pkl')
         if os.path.exists(partial_trn_model):
@@ -444,7 +443,7 @@ class NNTrainer(OneShotTrainerInterface):
         for target_id, (model, optimizer, loss_module) in container if (len(container) == 1) else \
                     tqdm.tqdm(container, leave=False, desc="Classes"):
 
-            model_filename = self._model_name(model_base_dir=model_base_dir,
+            model_filename = self.model_name(model_base_dir=model_base_dir,
                                               target_id=target_id)
 
             if os.path.exists(model_filename):
@@ -481,7 +480,7 @@ class NNTrainer(OneShotTrainerInterface):
                 n_epochs += 1
 
                 if partial_trn is not None:
-                    if partial_trn['epoch'] >= i_epoch:
+                    if start_epochs >= i_epoch:
                         continue
 
                 running_loss = []
@@ -560,21 +559,22 @@ class NNTrainer(OneShotTrainerInterface):
                 with open(partial_trn_model, 'wb') as f:
                     pickle.dump(state, f)
 
-                trn_batch_loss_arr, val_batch_loss_arr = np.array(trn_batch_loss), np.array(val_batch_loss)
+                trn_batch_loss_arr = np.array(trn_batch_loss)
+                val_batch_loss_arr = np.array(val_batch_loss)
 
-                batch_error_filename = self._model_name(model_base_dir=model_base_dir,
+                batch_error_filename = self.model_name(model_base_dir=model_base_dir,
                                                     target_id=target_id,
                                                     complement='trn_batch',
                                                     extention='png')
-                log_batch_error_filename = self._model_name(model_base_dir=model_base_dir,
+                log_batch_error_filename = self.model_name(model_base_dir=model_base_dir,
                                                     target_id=target_id,
                                                     complement='trn_batch_log',
                                                     extention='png')
-                epoch_error_filename = self._model_name(model_base_dir=model_base_dir,
+                epoch_error_filename = self.model_name(model_base_dir=model_base_dir,
                                                     target_id=target_id,
                                                     complement='trn_epochs',
                                                     extention='png')
-                log_epoch_error_filename = self._model_name(model_base_dir=model_base_dir,
+                log_epoch_error_filename = self.model_name(model_base_dir=model_base_dir,
                                                     target_id=target_id,
                                                     complement='trn_epochs_log',
                                                     extention='png')
@@ -618,12 +618,12 @@ class NNTrainer(OneShotTrainerInterface):
                 False otherwise.
         """
         if self.training_strategy == TrainingStrategy.MULTICLASS:
-            filename = self._model_name(model_base_dir=model_base_dir)
+            filename = self.model_name(model_base_dir=model_base_dir)
             return os.path.exists(filename)
 
         if self.training_strategy == TrainingStrategy.CLASS_SPECIALIST:
             for target_id in range(self.n_targets):
-                filename = self._model_name(model_base_dir=model_base_dir, target_id=target_id)
+                filename = self.model_name(model_base_dir=model_base_dir, target_id=target_id)
                 if not os.path.exists(filename):
                     return False
 
@@ -658,7 +658,7 @@ class NNTrainer(OneShotTrainerInterface):
             all_predictions = []
             all_targets = []
 
-            output_file = self._model_name(model_base_dir=eval_base_dir,
+            output_file = self.model_name(model_base_dir=eval_base_dir,
                                            complement=dataset_id,
                                            extention='csv')
 
@@ -670,7 +670,7 @@ class NNTrainer(OneShotTrainerInterface):
             loader = torch_data.DataLoader(dataset, batch_size=self.batch_size)
 
             if self.training_strategy == TrainingStrategy.MULTICLASS:
-                filename = self._model_name(model_base_dir=model_base_dir)
+                filename = self.model_name(model_base_dir=model_base_dir)
                 if not os.path.exists(filename):
                     raise FileNotFoundError(f"The model file '{filename}' does not exist. Ensure \
                                             that the model is trained before evaluating.")
@@ -690,7 +690,7 @@ class NNTrainer(OneShotTrainerInterface):
             elif self.training_strategy == TrainingStrategy.CLASS_SPECIALIST:
                 models = []
                 for target_id in range(self.n_targets):
-                    filename = self._model_name(model_base_dir=model_base_dir, target_id=target_id)
+                    filename = self.model_name(model_base_dir=model_base_dir, target_id=target_id)
                     if not os.path.exists(filename):
                         raise FileNotFoundError(f"The model file '{filename}' does not exist. \
                                                 Ensure that the model is trained before \
@@ -730,11 +730,12 @@ class NNTrainer(OneShotTrainerInterface):
             bool: True if all models are evaluated in the directory,
                 False otherwise.
         """
-        output_file = self._model_name(model_base_dir=eval_base_dir,
+        output_file = self.model_name(model_base_dir=eval_base_dir,
                                         complement=dataset_id,
                                         extention='csv')
 
         return os.path.exists(output_file)
+
 
 class Trainer():
     """Class for managing and executing training based on a TrainingConfig"""
@@ -750,6 +751,9 @@ class Trainer():
         """
         self.config = config
         self.trainer_list = trainer_list
+
+    def __str__(self) -> str:
+        return f'{self.config.name} with {len(self.trainer_list)} models'
 
     def __prepare_output_dir(self):
         """ Creates the directory tree for training, keeping backups of conflicting trainings. """
@@ -978,3 +982,54 @@ class Trainer():
                                                         result['Prediction'])
                 print("Confusion Matrix:")
                 print(pd.DataFrame(conf_matrix))
+
+
+class ModelComparator():
+
+    def __init__(self, output_dir: str, trainer_list: typing.List[Trainer]) -> None:
+        self.output_dir = output_dir
+        self.trainer_list = trainer_list
+
+    def cross_compare_in_test(self, only_firs_fold: bool = False):
+
+        for trainer_1, trainer_2 in itertools.permutations(self.trainer_list, 2):
+
+            test_df1, _ = trainer_2.config.get_split_datasets()
+
+            dataset = iara_data_proc.TorchDataset(trainer_2.config.dataset_processor,
+                                                test_df1['ID'],
+                                                test_df1['Target'])
+
+            print(f'\n#### trained in({trainer_1}) -> evaluated in({trainer_2}) ####')
+
+            for trainer in trainer_1.trainer_list:
+
+                for i_fold in range(trainer_1.config.n_folds):
+                    model_base_dir = os.path.join(trainer_1.config.output_base_dir,
+                                            'model',
+                                            f'{i_fold}_of_{trainer_1.config.n_folds}')
+
+                    evaluation = trainer.eval(
+                            dataset_id=f'{trainer_2.config.name}_{str(trainer_1.config.name)}_{i_fold}',
+                            eval_base_dir = self.output_dir,
+                            model_base_dir = model_base_dir,
+                            dataset = dataset)
+
+                    accuracy = sk_metrics.accuracy_score(evaluation['Target'],
+                                                        evaluation['Prediction'])
+                    print("Accuracy:", accuracy)
+
+                    f1 = sk_metrics.f1_score(evaluation['Target'],
+                                            evaluation['Prediction'],
+                                            average='weighted')
+                    print("F1-score:", f1)
+
+                    conf_matrix = sk_metrics.confusion_matrix(evaluation['Target'],
+                                                            evaluation['Prediction'])
+                    print("Confusion Matrix:")
+                    print(pd.DataFrame(conf_matrix))
+
+                    if only_firs_fold:
+                        break
+            # test_df2, _ = trainer_2.config.get_split_datasets()
+            # print(test_df2)

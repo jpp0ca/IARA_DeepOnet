@@ -11,8 +11,9 @@ This script generates two tests:
    - Classifier trained on OS_CPA_IN data and evaluated on OS_CPA_OUT data.
    - Classifier trained on OS_CPA_OUT data and evaluated on OS_CPA_IN data.
 """
-import argparse
+import os
 import tqdm
+import argparse
 
 import iara.description
 import iara.ml.mlp as iara_model
@@ -21,24 +22,34 @@ import iara.processing.analysis as iara_proc
 import iara.processing.dataset as iara_data_proc
 
 
-def main(override: bool, only_first_fold: bool, only_sample: bool):
+def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int):
     """Main function for the CPA analysis script."""
 
     config_dir = "./results/configs"
 
-    configs = {
-        'near_cpa': iara.description.DatasetType.OS_NEAR_CPA_IN,
-        'far_cpa': iara.description.DatasetType.OS_FAR_CPA_IN,
-        'cpa_in': iara.description.DatasetType.OS_CPA_IN,
-        'cpa_out': iara.description.DatasetType.OS_CPA_OUT
-    }
+    if cpa_test == 1:
+        configs = {
+            'near_cpa': iara.description.DatasetType.OS_NEAR_CPA_IN,
+            'far_cpa': iara.description.DatasetType.OS_FAR_CPA_IN,
+        }
+    elif cpa_test == 2:
+        configs = {
+            'cpa_in': iara.description.DatasetType.OS_CPA_IN,
+            'cpa_out': iara.description.DatasetType.OS_CPA_OUT
+        }
+    else:
+        print('Not implemented test')
+        return
 
+    config = False
+    trainer_list = []
     for config_name, data_type in tqdm.tqdm(configs.items(), leave=False, desc="Configs"):
 
         config = False
         if not override:
             try:
-                config = iara_trn.TrainingConfig.load(config_dir, config_name)
+                config = iara_trn.TrainingConfig.load(config_dir, config_name if not only_sample\
+                                        else f"{config_name}_sample")
 
             except FileNotFoundError:
                 pass
@@ -71,7 +82,8 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
                             name = config_name,
                             dataset = dataset,
                             dataset_processor = dp,
-                            output_base_dir = "./results/trainings/cpa_analysis_sample",
+                            output_base_dir = "./results/trainings/cpa_analysis" if not only_sample\
+                                        else "./results/trainings/cpa_analysis_sample" ,
                             n_folds=10 if not only_sample else 3,
                             test_factor=0.2)
 
@@ -81,10 +93,10 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
                                     training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
                                     trainer_id = 'MLP',
                                     n_targets = config.dataset.target.get_n_targets(),
-                                    model_allocator=lambda input_shape:
-                                                iara_model.MLP(input_shape=input_shape,
-                                                        n_neurons=64,
-                                                        n_targets=dataset.target.get_n_targets()),
+                                    model_allocator=lambda input_shape, n_targets:
+                                        iara_model.MLP(input_shape=input_shape,
+                                            n_neurons=64,
+                                            n_targets=n_targets),
                                     batch_size = 128,
                                     n_epochs = 256,
                                     patience=None)
@@ -100,9 +112,16 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
         #                             n_epochs = 256,
         #                             patience=None)
 
-        trainer = iara_trn.Trainer(config=config, trainer_list=[mlp_trainer])
+        trainer_list.append(iara_trn.Trainer(config=config, trainer_list=[mlp_trainer]))
 
-        trainer.run(only_first_fold = only_first_fold)
+        trainer_list[-1].run(only_first_fold = only_first_fold)
+
+    comparator = iara_trn.ModelComparator(
+                            output_dir= "./results/comparisons/cpa_analysis",
+                            trainer_list=trainer_list)
+
+    comparator.cross_compare_in_test(only_firs_fold=only_first_fold)
+
 
 
 if __name__ == "__main__":
@@ -113,6 +132,15 @@ if __name__ == "__main__":
                         help='Execute only first fold. For inspection purpose')
     parser.add_argument('--only_sample', action='store_true', default=False,
                         help='Execute only in sample_dataset. For quick training and test.')
+    test_choices=[1, 2]
+    parser.add_argument('--cpa_test', type=int, choices=test_choices, default=0,
+                        help='Choose test option\
+                            [1. Impact of the closest point for CPA,\
+                            2. Impact of records containing CPA]')
 
     args = parser.parse_args()
-    main(args.override, args.only_first_fold, args.only_sample)
+    if args.cpa_test == 0:
+        for n_test in test_choices:
+            main(args.override, args.only_first_fold, args.only_sample, n_test)
+    else:
+        main(args.override, args.only_first_fold, args.only_sample, args.cpa_test)
