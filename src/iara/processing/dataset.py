@@ -359,13 +359,15 @@ class TorchDataset(torch_data.Dataset):
             - data (pd.DataFrame): Input data.
             - target (pd.Series): Target corresponding to the input data.
         """
-        self.dataset_processor = dataset_processor
-        self.complete_data = pd.DataFrame()
+        self.data = pd.DataFrame()
         self.targets = pd.Series()
+        self.classes = np.unique(targets)
+
+        self.dataset_processor = dataset_processor
         self.dataset_ids = dataset_ids.values
         self.limit_ids = [0]
         self.last_id = -1
-        self.data = []
+        self.partial_data = []
 
         total_memory = 0
         for dataset_id, target in tqdm.tqdm(list(zip(dataset_ids, targets)),
@@ -379,9 +381,9 @@ class TorchDataset(torch_data.Dataset):
             total_memory += data_df.memory_usage(deep=True).sum()
 
             if total_memory > TorchDataset.MEMORY_LIMIT:
-                self.complete_data = None
+                self.data = None
             else:
-                self.complete_data = pd.concat([self.complete_data, data_df], ignore_index=True)
+                self.data = pd.concat([self.data, data_df], ignore_index=True)
 
         # # Uncomment to print total memory needed by keeping a dataset in memory
         # unity = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -393,21 +395,21 @@ class TorchDataset(torch_data.Dataset):
 
         self.targets = torch.tensor(self.targets.values, dtype=torch.int64)
 
-        if self.complete_data is not None:
-            self.complete_data = torch.tensor(self.complete_data.values, dtype=torch.float32)
+        if self.data is not None:
+            self.data = torch.tensor(self.data.values, dtype=torch.float32)
 
     def __len__(self):
         return self.limit_ids[-1]
 
     def __getitem__(self, index) -> typing.Tuple[torch.Tensor, torch.Tensor]:
-        if self.complete_data is not None:
-            return self.complete_data[index], self.targets[index]
+        if self.data is not None:
+            return self.data[index], self.targets[index]
 
         current_id = next(i for i, valor in enumerate(self.limit_ids) if valor > index) - 1
 
         if current_id != self.last_id:
             self.last_id = current_id
-            self.data = self.dataset_processor.get_data(self.dataset_ids[current_id])
-            self.data = torch.tensor(self.data.values, dtype=torch.float32)
+            self.partial_data = self.dataset_processor.get_data(self.dataset_ids[current_id])
+            self.partial_data = torch.tensor(self.partial_data.values, dtype=torch.float32)
 
-        return self.data[index - self.limit_ids[current_id]], self.targets[index]
+        return self.partial_data[index - self.limit_ids[current_id]], self.targets[index]
