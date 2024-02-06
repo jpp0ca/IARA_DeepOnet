@@ -17,7 +17,7 @@ class MLP(ml_model.BaseModel):
                  input_shape: typing.Union[int, typing.Iterable[int]],
                  n_neurons: int,
                  n_targets: int = 1,
-                 dropout: float = 0.2,
+                 regularization: torch.nn.Module = torch.nn.Dropout(0.2),
                  activation_hidden_layer: torch.nn.Module = torch.nn.ReLU(),
                  activation_output_layer: torch.nn.Module = torch.nn.Sigmoid()):
         """
@@ -35,6 +35,7 @@ class MLP(ml_model.BaseModel):
         super().__init__()
         self.n_neurons = n_neurons
         self.n_targets = n_targets
+        self.regularization = regularization
 
         input_dim = functools.reduce(lambda x, y: x * y, input_shape)
 
@@ -42,7 +43,6 @@ class MLP(ml_model.BaseModel):
             torch.nn.Flatten(1),
             torch.nn.Linear(input_dim, self.n_neurons),
             activation_hidden_layer,
-            torch.nn.Dropout(dropout),
         )
 
         self.activation = torch.nn.Sequential(
@@ -64,6 +64,8 @@ class MLP(ml_model.BaseModel):
             torch.Tensor: prediction
         """
         data = self.model(data)
+        if self.regularization is not None:
+            data = self.regularization(data)
         prediction = self.activation(data)
 
         if self.n_targets > 1:

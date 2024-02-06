@@ -179,6 +179,9 @@ class OneShotTrainerInterface():
         self.trainer_id = trainer_id
         self.n_targets = n_targets
 
+    def __str__(self) -> str:
+        return f'{self.trainer_id}_{str(self.training_strategy)}'
+
     def model_name(self,
                     model_base_dir: str,
                     target_id: typing.Optional[int] = None,
@@ -364,9 +367,6 @@ class NNTrainer(OneShotTrainerInterface):
         self.optimizer_allocator = optimizer_allocator or NNTrainer.default_optimizer_allocator
         self.loss_allocator = loss_allocator or self.training_strategy.default_loss
         self.device = device
-
-    def __str__(self) -> str:
-        return f'{self.trainer_id}_{str(self.training_strategy)}'
 
     def _prepare_for_training(self, trn_dataset: torch_data.Dataset) -> \
             typing.Dict[int,typing.Tuple[iara_model.BaseModel,
@@ -1153,7 +1153,7 @@ class ModelComparator():
                         model_base_dir = model_base_dir,
                         dataset = dataset)
 
-                    grid.add(grid_id=f'{trainer_1.config.name} -> {trainer_2.config.name}',
+                    grid.add(grid_id=f'{trainer_1.config.name} ({str(trainer)}) -> {trainer_2.config.name}',
                              i_fold=i_fold,
                              target=evaluation['Target'],
                              prediction=evaluation['Prediction'])

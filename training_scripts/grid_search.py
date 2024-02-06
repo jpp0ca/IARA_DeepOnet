@@ -10,6 +10,8 @@ The chosen configuration will then be used for further training and analysis in 
 """
 import argparse
 
+import torch
+
 import iara.description
 import iara.ml.mlp as iara_model
 import iara.trainer as iara_trn
@@ -26,7 +28,6 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
         'grid_search': iara.description.DatasetType.OS_SHIP
     }
 
-    # for config_name, data_type in tqdm.tqdm(configs.items(), leave=False, desc="Configs"):
     for config_name, data_type in configs.items():
 
         config = False
@@ -71,30 +72,173 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
             config.save(config_dir)
 
         mlp_trainers = []
-        for n_neurons in [4, 16, 64]:
-            mlp_trainers.append(iara_trn.NNTrainer(
-                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
-                                    trainer_id = f'MLP_{n_neurons}',
-                                    n_targets = config.dataset.target.get_n_targets(),
-                                    model_allocator=lambda input_shape, n_targets:
-                                        iara_model.MLP(input_shape=input_shape,
-                                            n_neurons=n_neurons,
-                                            n_targets=n_targets),
-                                    batch_size = 128,
-                                    n_epochs = 64,
-                                    patience=8))
 
-        # for n_neurons in [4, 16, 64]:
-        #     mlp_trainers.append(iara_trn.NNTrainer(
-        #                             training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
-        #                             trainer_id = f'MLP_{n_neurons}',
-        #                             n_targets = config.dataset.target.get_n_targets(),
-        #                             model_allocator=lambda input_shape, _:
-        #                                 iara_model.MLP(input_shape=input_shape,
-        #                                     n_neurons=n_neurons),
-        #                             batch_size = 128,
-        #                             n_epochs = 64,
-        #                             patience=8))
+        mlp_trainers.append(iara_trn.NNTrainer(
+                                training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                trainer_id = 'MLP_4',
+                                n_targets = config.dataset.target.get_n_targets(),
+                                model_allocator=lambda input_shape, n_targets:
+                                    iara_model.MLP(input_shape=input_shape,
+                                        n_neurons=4,
+                                        n_targets=n_targets),
+                                optimizer_allocator=lambda model:
+                                    torch.optim.Adam(model.parameters(), lr=5e-5),
+                                batch_size = 128,
+                                n_epochs = 256,
+                                patience=8))
+
+        mlp_trainers.append(iara_trn.NNTrainer(
+                                training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                trainer_id = 'MLP_16',
+                                n_targets = config.dataset.target.get_n_targets(),
+                                model_allocator=lambda input_shape, n_targets:
+                                    iara_model.MLP(input_shape=input_shape,
+                                        n_neurons=16,
+                                        n_targets=n_targets),
+                                optimizer_allocator=lambda model:
+                                    torch.optim.Adam(model.parameters(), lr=5e-5),
+                                batch_size = 128,
+                                n_epochs = 256,
+                                patience=8))
+
+        mlp_trainers.append(iara_trn.NNTrainer(
+                                training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                trainer_id = 'MLP_64',
+                                n_targets = config.dataset.target.get_n_targets(),
+                                model_allocator=lambda input_shape, n_targets:
+                                    iara_model.MLP(input_shape=input_shape,
+                                        n_neurons=64,
+                                        n_targets=n_targets),
+                                optimizer_allocator=lambda model:
+                                    torch.optim.Adam(model.parameters(), lr=5e-5),
+                                batch_size = 128,
+                                n_epochs = 256,
+                                patience=8))
+
+        mlp_trainers.append(iara_trn.NNTrainer(
+                                training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+                                trainer_id = 'MLP_4',
+                                n_targets = config.dataset.target.get_n_targets(),
+                                model_allocator=lambda input_shape, n_targets:
+                                    iara_model.MLP(input_shape=input_shape,
+                                        n_neurons=4),
+                                optimizer_allocator=lambda model:
+                                    torch.optim.Adam(model.parameters(), lr=5e-5),
+                                batch_size = 128,
+                                n_epochs = 256,
+                                patience=8))
+
+        mlp_trainers.append(iara_trn.NNTrainer(
+                                training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+                                trainer_id = 'MLP_16',
+                                n_targets = config.dataset.target.get_n_targets(),
+                                model_allocator=lambda input_shape, n_targets:
+                                    iara_model.MLP(input_shape=input_shape,
+                                        n_neurons=16),
+                                optimizer_allocator=lambda model:
+                                    torch.optim.Adam(model.parameters(), lr=5e-5),
+                                batch_size = 128,
+                                n_epochs = 256,
+                                patience=8))
+
+        mlp_trainers.append(iara_trn.NNTrainer(
+                                training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+                                trainer_id = 'MLP_64',
+                                n_targets = config.dataset.target.get_n_targets(),
+                                model_allocator=lambda input_shape, n_targets:
+                                    iara_model.MLP(input_shape=input_shape,
+                                        n_neurons=64),
+                                optimizer_allocator=lambda model:
+                                    torch.optim.Adam(model.parameters(), lr=5e-5),
+                                batch_size = 128,
+                                n_epochs = 256,
+                                patience=8))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+                                    trainer_id = 'Forest_25_None',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=25,
+                                    max_depth=None))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+                                    trainer_id = 'Forest_100_None',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=100,
+                                    max_depth=None))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+                                    trainer_id = 'Forest_250_None',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=250,
+                                    max_depth=None))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                    trainer_id = 'Forest_25_None',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=25,
+                                    max_depth=None))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                    trainer_id = 'Forest_100_None',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=100,
+                                    max_depth=None))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                    trainer_id = 'Forest_250_None',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=250,
+                                    max_depth=None))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                    trainer_id = 'Forest_25_5',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=25,
+                                    max_depth=5))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                    trainer_id = 'Forest_100_5',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=100,
+                                    max_depth=5))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                    trainer_id = 'Forest_250_5',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=250,
+                                    max_depth=5))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                    trainer_id = 'Forest_25_20',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=25,
+                                    max_depth=20))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                    trainer_id = 'Forest_100_20',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=100,
+                                    max_depth=20))
+
+        mlp_trainers.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                    trainer_id = 'Forest_250_20',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=250,
+                                    max_depth=20))
+
+
 
         trainer = iara_trn.Trainer(config=config, trainer_list=mlp_trainers)
 

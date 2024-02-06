@@ -13,6 +13,8 @@ This script generates two tests:
 """
 import argparse
 
+import torch
+
 import iara.description
 import iara.ml.mlp as iara_model
 import iara.trainer as iara_trn
@@ -87,7 +89,17 @@ def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int
 
             config.save(config_dir)
 
-        mlp_trainer = iara_trn.NNTrainer(
+        oneshot_trainer_list = []
+
+
+        oneshot_trainer_list.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+                                    trainer_id = 'RandomForest',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=100,
+                                    max_depth=None))
+
+        oneshot_trainer_list.append(iara_trn.NNTrainer(
                                     training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
                                     trainer_id = 'MLP',
                                     n_targets = config.dataset.target.get_n_targets(),
@@ -95,22 +107,31 @@ def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int
                                         iara_model.MLP(input_shape=input_shape,
                                             n_neurons=64,
                                             n_targets=n_targets),
+                                    optimizer_allocator=lambda model:
+                                        torch.optim.Adam(model.parameters(), lr=5e-5),
                                     batch_size = 128,
                                     n_epochs = 256,
-                                    patience=None)
+                                    patience=8))
 
-        # mlp_trainer = iara_trn.NNTrainer(
-        #                             training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
-        #                             trainer_id = 'MLP',
-        #                             n_targets = config.dataset.target.get_n_targets(),
-        #                             model_allocator=lambda input_shape, _:
-        #                                 iara_model.MLP(input_shape=input_shape,
-        #                                     n_neurons=64),
-        #                             batch_size = 128,
-        #                             n_epochs = 256,
-        #                             patience=None)
+        oneshot_trainer_list.append(iara_trn.ForestTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+                                    trainer_id = 'RandomForest',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators=100,
+                                    max_depth=None))
 
-        trainer_list.append(iara_trn.Trainer(config=config, trainer_list=[mlp_trainer]))
+        oneshot_trainer_list.append(iara_trn.NNTrainer(
+                                    training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+                                    trainer_id = 'MLP',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    model_allocator=lambda input_shape, _:
+                                        iara_model.MLP(input_shape=input_shape,
+                                            n_neurons=64),
+                                    batch_size = 128,
+                                    n_epochs = 256,
+                                    patience=None))
+
+        trainer_list.append(iara_trn.Trainer(config=config, trainer_list=oneshot_trainer_list))
 
         trainer_list[-1].run(only_first_fold = only_first_fold)
 
