@@ -6,8 +6,8 @@ Neighbor Embedding (t-SNE), a dimensionality reduction technique particularly us
 complex datasets in a lower-dimensional space.
 """
 import numpy as np
-import sklearn.manifold as sklearn
 import matplotlib.pyplot as plt
+import sklearn.manifold as sklearn
 
 def export_tsne(data: np.ndarray, labels: np.ndarray, filename: str) -> None:
     """

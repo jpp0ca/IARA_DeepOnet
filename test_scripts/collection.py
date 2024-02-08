@@ -7,18 +7,18 @@ In the future, this test should lead to an application that generates .tex table
 """
 import pandas as pd
 
-import iara.description
+import iara.records
 
 
 def main(show_sample_dataset = False):
     """Main function for the dataset info tables."""
 
     os_ship_merged = []
-    for sub in iara.description.DatasetType:
-        if sub.value > iara.description.DatasetType.OS_SHIP.value:
+    for sub in iara.records.Collection:
+        if sub.value > iara.records.Collection.OS_SHIP.value:
             continue
 
-        df = sub.info_to_df(only_sample=show_sample_dataset)
+        df = sub.to_df(only_sample=show_sample_dataset)
         part = df.groupby(['TYPE','DETAILED TYPE']).size().reset_index(name=str(sub))
 
         if not isinstance(os_ship_merged, pd.DataFrame):
@@ -34,10 +34,10 @@ def main(show_sample_dataset = False):
     print(os_ship_merged)
 
 
-    os_bg = iara.description.DatasetType.E.info_to_df(only_sample=show_sample_dataset)
+    os_bg = iara.records.Collection.E.to_df(only_sample=show_sample_dataset)
     os_bg_merged = os_bg.groupby(['Rain state', 'Sea state']).size().reset_index(name='Qtd')
 
-    order = {str(rain_enum): rain_enum.value for rain_enum in iara.description.Rain}
+    order = {str(rain_enum): rain_enum.value for rain_enum in iara.records.Rain}
     os_bg_merged['Order'] = os_bg_merged['Rain state'].map(order)
     os_bg_merged = os_bg_merged.sort_values('Order').drop('Order', axis=1).reset_index(drop=True)
 

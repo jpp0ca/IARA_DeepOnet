@@ -1,14 +1,11 @@
-import typing
-
-import numpy as np
-import pandas as pd
+"""
+Module containing a Forest based models.
+"""
 import sklearn.ensemble as sk_ensemble
 
 import torch
-import torch.utils.data as torch_data
 
-
-import iara.ml.base_model as iara_model
+import iara.ml.models.base_model as iara_model
 
 class RandomForestModel(iara_model.BaseModel):
     """A class representing a Random Forest model."""
@@ -24,7 +21,8 @@ class RandomForestModel(iara_model.BaseModel):
         """
         super().__init__()
         self.random_forest = sk_ensemble.RandomForestClassifier(n_estimators=n_estimators,
-                                                                max_depth=max_depth)
+                                                                max_depth=max_depth,
+                                                                class_weight='balanced')
 
     def forward(self, data: torch.Tensor) -> torch.Tensor:
         """

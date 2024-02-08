@@ -1,14 +1,11 @@
 """
-Module containing a Multi-Layer Perceptron (MLP) model.
-
-Classes:
-    - MLP: Multi-Layer Perceptron model for regression tasks.
+Module containing a Multi-Layer Perceptron (MLP) based models.
 """
 import functools
 import typing
 import torch
 
-import iara.ml.base_model as ml_model
+import iara.ml.models.base_model as ml_model
 
 class MLP(ml_model.BaseModel):
     """Multi-Layer Perceptron (MLP) model."""

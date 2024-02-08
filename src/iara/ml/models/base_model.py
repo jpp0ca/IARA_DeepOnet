@@ -4,7 +4,7 @@ This module provides base classes for building and serializing PyTorch models.
 Classes:
     - SerializableModel: A base class for serializable PyTorch models, providing methods for saving
         and loading models using pickle.
-    - Base: A base class for PyTorch models with serialization support, inheriting from both
+    - BaseModel: A base class for PyTorch models with serialization support, inheriting from both
         torch.nn.Module and SerializableModel.
 """
 import abc

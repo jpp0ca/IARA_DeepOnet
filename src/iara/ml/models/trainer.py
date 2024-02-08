@@ -1,120 +1,33 @@
 """
 Trainer description Module
 
-This module provides classes for configure and training machine learning models.
+This module provides classes for training machine learning models.
 """
 import os
 import enum
 import typing
-import datetime
-import shutil
 import abc
 import pickle
-import itertools
 
 import tqdm
 import numpy as np
 import pandas as pd
-import jsonpickle
 import matplotlib.pyplot as plt
 
-import sklearn.model_selection as sk_selection
 import sklearn.utils.class_weight as sk_utils
 
 import torch
 import torch.utils.data as torch_data
 
-import iara.description
-import iara.processing.dataset as iara_data_proc
-import iara.ml.base_model as iara_model
-import iara.ml.forest as iara_forest
 import iara.utils
-import iara.ml.metrics as iara_metrics
+import iara.records
+import iara.ml.models.forest as iara_forest
+import iara.ml.models.base_model as iara_model
+import iara.ml.dataset as iara_dataset
 
 
-class TrainingConfig:
-    """Class representing training configuration."""
-    time_str_format = "%Y%m%d-%H%M%S"
-
-    def __init__(self,
-                name: str,
-                dataset: iara.description.CustomDataset,
-                dataset_processor: iara_data_proc.DatasetProcessor,
-                output_base_dir: str,
-                n_folds: int = 10,
-                test_factor: float = 0.2):
-        """
-        Parameters:
-        - name (str): A unique identifier for the training configuration.
-        - dataset (iara.description.CustomDataset): The dataset used for training.
-        - dataset_processor (iara.processing.dataset.DatasetProcessor):
-            The DatasetProcessor for accessing and processing data in the dataset.
-        - output_base_dir (str): The base directory for storing training outputs.
-        - n_folds (int, optional): Number of folds for Kfold cross-validation. Default is 10.
-        - test_factor (float, optional): Fraction of the dataset reserved for the test subset.
-            Default is 0.2 (20%).
-        """
-        self.timestring = datetime.datetime.now().strftime(self.time_str_format)
-        self.name = name
-        self.dataset = dataset
-        self.dataset_processor = dataset_processor
-        self.output_base_dir = os.path.join(output_base_dir, self.name)
-        self.n_folds = n_folds
-        self.test_factor = test_factor
-
-    def __str__(self) -> str:
-        return  f"----------- {self.name} ----------- \n{str(self.dataset)}"
-
-    def save(self, file_dir: str) -> None:
-        """Save the TrainingConfig to a JSON file."""
-        os.makedirs(file_dir, exist_ok = True)
-        file_path = os.path.join(file_dir, f"{self.name}.json")
-        with open(file_path, 'w', encoding="utf-8") as json_file:
-            json_str = jsonpickle.encode(self, indent=4)
-            json_file.write(json_str)
-
-    @staticmethod
-    def load(file_dir: str, name: str) -> 'TrainingConfig':
-        """Read a JSON file and return a TrainingConfig instance."""
-        file_path = os.path.join(file_dir, f"{name}.json")
-        with open(file_path, 'r', encoding="utf-8") as json_file:
-            json_str = json_file.read()
-        return jsonpickle.decode(json_str)
-
-    def get_split_datasets(self) -> \
-        typing.Tuple[pd.DataFrame, typing.List[typing.Tuple[pd.DataFrame, pd.DataFrame]]]:
-        """
-        Split the dataset into training, validation, and test sets.
-
-        Returns:
-        - test_set (pd.DataFrame): Test set with a stratified split.
-        - trn_val_set_list (list): List of tuples containing training and validation sets
-            for each fold in StratifiedKFold strategy
-        """
-        df = self.dataset.get_dataset_info()
-
-        sss = sk_selection.StratifiedShuffleSplit(n_splits=1,
-                                                  test_size=self.test_factor, random_state=42)
-
-        for trn_val_index, test_index in sss.split(df, df['Target']):
-            trn_val_set, test_set = df.iloc[trn_val_index], df.iloc[test_index]
-
-        # Move elements with 'Ship ID' present in test set and trn_val_set set to test set
-        for ship_id in test_set['Ship ID'].unique():
-            ship_data = trn_val_set[trn_val_set['Ship ID'] == ship_id]
-            test_set = pd.concat([test_set, ship_data])
-            trn_val_set = trn_val_set[trn_val_set['Ship ID'] != ship_id]
-
-        skf = sk_selection.StratifiedKFold(n_splits=self.n_folds, shuffle=True, random_state=42)
-
-        trn_val_set_list = []
-        for trn_idx, val_idx in skf.split(trn_val_set, trn_val_set['Target']):
-            trn_val_set_list.append((trn_val_set.iloc[trn_idx], trn_val_set.iloc[val_idx]))
-
-        return test_set, trn_val_set_list
-
-class TrainingStrategy(enum.Enum):
-    """Enum defining training strategies."""
+class ModelTrainingStrategy(enum.Enum):
+    """Enum defining model training strategies."""
     CLASS_SPECIALIST =0,
     MULTICLASS=1
 
@@ -131,11 +44,11 @@ class TrainingStrategy(enum.Enum):
         Returns:
             torch.nn.Module: The torch loss function module.
         """
-        if self == TrainingStrategy.CLASS_SPECIALIST:
+        if self == ModelTrainingStrategy.CLASS_SPECIALIST:
             return torch.nn.BCELoss(weight=class_weights[1]/class_weights[0],
                                     reduction='mean')
 
-        if self == TrainingStrategy.MULTICLASS:
+        if self == ModelTrainingStrategy.MULTICLASS:
             return torch.nn.CrossEntropyLoss(weight=class_weights,
                                              reduction='mean')
 
@@ -154,12 +67,12 @@ class TrainingStrategy(enum.Enum):
         Returns:
             str: A string to use as the model identifier.
         """
-        if self == TrainingStrategy.CLASS_SPECIALIST:
+        if self == ModelTrainingStrategy.CLASS_SPECIALIST:
             if target_id is None:
                 return "specialist"
             return f"specialist({target_id})"
 
-        if self == TrainingStrategy.MULTICLASS:
+        if self == ModelTrainingStrategy.MULTICLASS:
             return "multiclass"
 
         raise NotImplementedError('TrainingStrategy has not default_loss implemented')
@@ -167,12 +80,18 @@ class TrainingStrategy(enum.Enum):
     def __str__(self) -> str:
         return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
 
-class OneShotTrainerInterface():
-    """Interface defining methods that should be implemented by classes to serve as a trainer
-        in the Trainer class."""
+class BaseTrainer():
+    """
+    Abstract base class defining methods that should be implemented by subclasses
+    to serve as a trainer for models in the experiment module.
+
+    This class defines the interface for trainers that are responsible for training
+    and evaluating models during experiments. Subclasses must implement the required
+    methods to customize the training behavior for specific models.
+    """
 
     def __init__(self,
-                 training_strategy: TrainingStrategy,
+                 training_strategy: ModelTrainingStrategy,
                  trainer_id: str,
                  n_targets: int) -> None:
         self.training_strategy = training_strategy
@@ -182,7 +101,22 @@ class OneShotTrainerInterface():
     def __str__(self) -> str:
         return f'{self.trainer_id}_{str(self.training_strategy)}'
 
-    def model_name(self,
+    @staticmethod
+    def _class_weight(dataset: iara_dataset.BaseDataset, target_id: int = None) -> torch.Tensor:
+        targets = dataset.targets
+        if target_id is not None:
+            targets = torch.where(targets == target_id, torch.tensor(1.0), torch.tensor(0.0))
+
+        targets = targets.numpy()
+        classes=np.unique(targets)
+
+        class_weights = sk_utils.compute_class_weight('balanced',
+                                                    classes=classes,
+                                                    y=targets)
+        class_weights = torch.tensor(class_weights, dtype=torch.float)
+        return class_weights
+
+    def output_filename(self,
                     model_base_dir: str,
                     target_id: typing.Optional[int] = None,
                     complement: str = None,
@@ -206,8 +140,8 @@ class OneShotTrainerInterface():
     @abc.abstractmethod
     def fit(self,
             model_base_dir: str,
-            trn_dataset: torch_data.Dataset,
-            val_dataset: torch_data.Dataset) -> None:
+            trn_dataset: iara_dataset.BaseDataset,
+            val_dataset: iara_dataset.BaseDataset) -> None:
         """
         Abstract method to fit (train) the model.
 
@@ -217,8 +151,8 @@ class OneShotTrainerInterface():
         Args:
             model_base_dir (str): The base directory to save any training-related outputs
                 or artifacts.
-            trn_dataset (torch_data.Dataset): The training dataset.
-            val_dataset (torch_data.Dataset): The validation dataset.
+            trn_dataset (iara_dataset.BaseDataset): The training dataset.
+            val_dataset (iara_dataset.BaseDataset): The validation dataset.
 
         Returns:
             None
@@ -235,13 +169,13 @@ class OneShotTrainerInterface():
             bool: True if all training is completed and models are saved in the directory,
                 False otherwise.
         """
-        if self.training_strategy == TrainingStrategy.MULTICLASS:
-            filename = self.model_name(model_base_dir=model_base_dir)
+        if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
+            filename = self.output_filename(model_base_dir=model_base_dir)
             return os.path.exists(filename)
 
-        if self.training_strategy == TrainingStrategy.CLASS_SPECIALIST:
+        if self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
             for target_id in range(self.n_targets):
-                filename = self.model_name(model_base_dir=model_base_dir, target_id=target_id)
+                filename = self.output_filename(model_base_dir=model_base_dir, target_id=target_id)
                 if not os.path.exists(filename):
                     return False
 
@@ -255,7 +189,7 @@ class OneShotTrainerInterface():
             dataset_id: str,
             eval_base_dir: str,
             model_base_dir: typing.Optional[str] = None,
-            dataset: torch_data.Dataset = None) -> pd.DataFrame:
+            dataset: iara_dataset.BaseDataset = None) -> pd.DataFrame:
         """
         Abstract method to evaluate the model.
 
@@ -266,8 +200,8 @@ class OneShotTrainerInterface():
             dataset_id (str): Identifier for the evaluation.
             eval_base_dir (str): The base directory to save any evaluation-related outputs
                 or artifacts.
-            dataset typing.Optional(torch_data.Dataset): The dataset to evaluate with non set the
-                evaluation must already be done.
+            dataset typing.Optional(iara_dataset.BaseDataset): The dataset to evaluate with non set
+                the evaluation must already be done.
 
         Returns:
             pandas.DataFrame: DataFrame with two columns, ["Target", "Prediction"]
@@ -285,15 +219,14 @@ class OneShotTrainerInterface():
             bool: True if all models are evaluated in the directory,
                 False otherwise.
         """
-        output_file = self.model_name(model_base_dir=eval_base_dir,
+        output_file = self.output_filename(model_base_dir=eval_base_dir,
                                         complement=dataset_id,
                                         extention='csv')
 
         return os.path.exists(output_file)
 
-
-class NNTrainer(OneShotTrainerInterface):
-    """Implementation of the OneShotTrainerInterface for training neural networks."""
+class OptimizerTrainer(BaseTrainer):
+    """Implementation of the BaseTrainer for training neural networks."""
 
     @staticmethod
     def default_optimizer_allocator(model: iara_model.BaseModel) -> torch.optim.Optimizer:
@@ -306,25 +239,10 @@ class NNTrainer(OneShotTrainerInterface):
         Returns:
             torch.optim.Optimizer: The allocated optimizer.
         """
-        return torch.optim.Adam(model.parameters(), lr=1e-3)
-
-    @staticmethod
-    def _class_weight(trn_dataset: torch_data.Dataset, target_id: int = None) -> torch.Tensor:
-        targets = trn_dataset.targets
-        if target_id is not None:
-            targets = torch.where(targets == target_id, torch.tensor(1.0), torch.tensor(0.0))
-
-        targets = targets.numpy()
-        classes=np.unique(targets)
-
-        class_weights = sk_utils.compute_class_weight('balanced',
-                                                    classes=classes,
-                                                    y=targets)
-        class_weights = torch.tensor(class_weights, dtype=torch.float)
-        return class_weights
+        return torch.optim.Adam(model.parameters(), lr=1e-5)
 
     def __init__(self,
-                 training_strategy: TrainingStrategy,
+                 training_strategy: ModelTrainingStrategy,
                  trainer_id: str,
                  n_targets: int,
                  model_allocator: typing.Callable[[typing.List[int], int],iara_model.BaseModel],
@@ -364,11 +282,12 @@ class NNTrainer(OneShotTrainerInterface):
         self.batch_size = batch_size
         self.n_epochs = n_epochs
         self.patience = patience
-        self.optimizer_allocator = optimizer_allocator or NNTrainer.default_optimizer_allocator
+        self.optimizer_allocator = optimizer_allocator or \
+                                    OptimizerTrainer.default_optimizer_allocator
         self.loss_allocator = loss_allocator or self.training_strategy.default_loss
         self.device = device
 
-    def _prepare_for_training(self, trn_dataset: torch_data.Dataset) -> \
+    def _prepare_for_training(self, trn_dataset: iara_dataset.BaseDataset) -> \
             typing.Dict[int,typing.Tuple[iara_model.BaseModel,
                                          torch.optim.Optimizer,
                                          torch.nn.Module]]:
@@ -376,17 +295,17 @@ class NNTrainer(OneShotTrainerInterface):
         input_shape = list(trn_dataset[0][0].shape)
         trn_dict = {}
 
-        if self.training_strategy == TrainingStrategy.CLASS_SPECIALIST:
+        if self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
             for target_id in range(self.n_targets):
                 class_weights = self._class_weight(trn_dataset, target_id).to(self.device)
 
-                model = self.model_allocator(input_shape, self.n_targets).to(self.device)
+                model = self.model_allocator(input_shape, 1).to(self.device)
                 optimizer = self.optimizer_allocator(model)
                 loss = self.loss_allocator(class_weights)
                 trn_dict[target_id] = model, optimizer, loss
             return trn_dict
 
-        if self.training_strategy == TrainingStrategy.MULTICLASS:
+        if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
             class_weights = self._class_weight(trn_dataset).to(self.device)
 
             model = self.model_allocator(input_shape, self.n_targets).to(self.device)
@@ -398,7 +317,7 @@ class NNTrainer(OneShotTrainerInterface):
 
         raise NotImplementedError('TrainingStrategy has not _loss implemented')
 
-    def _check_dataset(self, dataset: torch_data.Dataset):
+    def _check_dataset(self, dataset: iara_dataset.BaseDataset):
         unique_targets = torch.unique(dataset.targets)
         expected_targets = torch.arange(self.n_targets)
 
@@ -426,15 +345,15 @@ class NNTrainer(OneShotTrainerInterface):
 
     def fit(self,
             model_base_dir: str,
-            trn_dataset: torch_data.Dataset,
-            val_dataset: torch_data.Dataset) -> None:
-        """Implementation of OneShotTrainerInterface.fit method, to fit (train) the model.
+            trn_dataset: iara_dataset.BaseDataset,
+            val_dataset: iara_dataset.BaseDataset) -> None:
+        """Implementation of BaseTrainer.fit method, to fit (train) the model.
 
         Args:
             model_base_dir (str): The base directory to save any training-related outputs
                 or artifacts.
-            trn_dataset (torch_data.Dataset): The training dataset.
-            val_dataset (torch_data.Dataset): The validation dataset.
+            trn_dataset (iara_dataset.BaseDataset): The training dataset.
+            val_dataset (iara_dataset.BaseDataset): The validation dataset.
 
         Returns:
             None
@@ -455,7 +374,7 @@ class NNTrainer(OneShotTrainerInterface):
 
         container = self._prepare_for_training(trn_dataset=trn_dataset).items()
 
-        partial_trn_model = self.model_name(model_base_dir=model_base_dir,
+        partial_trn_model = self.output_filename(model_base_dir=model_base_dir,
                                              complement='partial',
                                              extention='pkl')
         if os.path.exists(partial_trn_model):
@@ -467,7 +386,7 @@ class NNTrainer(OneShotTrainerInterface):
         for target_id, (model, optimizer, loss_module) in container if (len(container) == 1) else \
                     tqdm.tqdm(container, leave=False, desc="Classes"):
 
-            model_filename = self.model_name(model_base_dir=model_base_dir,
+            model_filename = self.output_filename(model_base_dir=model_base_dir,
                                               target_id=target_id)
 
             if os.path.exists(model_filename):
@@ -484,7 +403,7 @@ class NNTrainer(OneShotTrainerInterface):
             n_epochs = 0
 
             if partial_trn is not None:
-                if partial_trn['target_id'] > target_id:
+                if target_id is not None and partial_trn['target_id'] > target_id:
                     continue
 
                 if partial_trn['target_id'] == target_id:
@@ -586,19 +505,19 @@ class NNTrainer(OneShotTrainerInterface):
                 trn_batch_loss_arr = np.array(trn_batch_loss)
                 val_batch_loss_arr = np.array(val_batch_loss)
 
-                batch_error_filename = self.model_name(model_base_dir=model_base_dir,
+                batch_error_filename = self.output_filename(model_base_dir=model_base_dir,
                                                     target_id=target_id,
                                                     complement='trn_batch',
                                                     extention='png')
-                log_batch_error_filename = self.model_name(model_base_dir=model_base_dir,
+                log_batch_error_filename = self.output_filename(model_base_dir=model_base_dir,
                                                     target_id=target_id,
                                                     complement='trn_batch_log',
                                                     extention='png')
-                epoch_error_filename = self.model_name(model_base_dir=model_base_dir,
+                epoch_error_filename = self.output_filename(model_base_dir=model_base_dir,
                                                     target_id=target_id,
                                                     complement='trn_epochs',
                                                     extention='png')
-                log_epoch_error_filename = self.model_name(model_base_dir=model_base_dir,
+                log_epoch_error_filename = self.output_filename(model_base_dir=model_base_dir,
                                                     target_id=target_id,
                                                     complement='trn_epochs_log',
                                                     extention='png')
@@ -634,9 +553,9 @@ class NNTrainer(OneShotTrainerInterface):
             dataset_id: str,
             eval_base_dir: str,
             model_base_dir: typing.Optional[str] = None,
-            dataset: typing.Optional[torch_data.Dataset] = None) -> pd.DataFrame:
+            dataset: typing.Optional[iara_dataset.BaseDataset] = None) -> pd.DataFrame:
         """
-        Implementation of OneShotTrainerInterface.eval method, to eval the model using the
+        Implementation of BaseTrainer.eval method, to eval the model using the
             provided dataset.
 
         Args:
@@ -645,8 +564,8 @@ class NNTrainer(OneShotTrainerInterface):
                 or artifacts.
             model_base_dir typing.Optional(str): The base directory to save read trained models
                 with non set the evaluation must already be done.
-            dataset typing.Optional(torch_data.Dataset): The dataset to evaluate with non set the
-                evaluation must already be done.
+            dataset typing.Optional(iara_dataset.BaseDataset): The dataset to evaluate with non set
+                the evaluation must already be done.
 
         Returns:
             pandas.DataFrame: DataFrame with two columns, ["Target", "Prediction"]
@@ -656,19 +575,26 @@ class NNTrainer(OneShotTrainerInterface):
             all_predictions = []
             all_targets = []
 
-            output_file = self.model_name(model_base_dir=eval_base_dir,
+            output_file = self.output_filename(model_base_dir=eval_base_dir,
                                            complement=dataset_id,
                                            extention='csv')
 
             if os.path.exists(output_file):
-                return pd.read_csv(output_file)
+                df = pd.read_csv(output_file)
+
+                prediction_columns = [col for col in df.columns if col.startswith('Prediction_')]
+                max_prediction_index = np.argmax(df[prediction_columns].to_numpy(),axis=1)
+                df_result = pd.DataFrame({'Prediction': max_prediction_index,
+                                          'Target': df['Target']})
+
+                return df_result
 
             os.makedirs(eval_base_dir, exist_ok=True)
 
             loader = torch_data.DataLoader(dataset, batch_size=self.batch_size)
 
-            if self.training_strategy == TrainingStrategy.MULTICLASS:
-                filename = self.model_name(model_base_dir=model_base_dir)
+            if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
+                filename = self.output_filename(model_base_dir=model_base_dir)
                 if not os.path.exists(filename):
                     raise FileNotFoundError(f"The model file '{filename}' does not exist. Ensure \
                                             that the model is trained before evaluating.")
@@ -681,14 +607,15 @@ class NNTrainer(OneShotTrainerInterface):
                     samples = samples.to(self.device)
                     predictions = model(samples)
 
-                    all_predictions.extend(predictions.argmax(dim=1).cpu().tolist())
+                    all_predictions.extend(predictions.cpu().tolist())
                     all_targets.extend(targets.cpu().tolist())
 
 
-            elif self.training_strategy == TrainingStrategy.CLASS_SPECIALIST:
+            elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
                 models = []
                 for target_id in range(self.n_targets):
-                    filename = self.model_name(model_base_dir=model_base_dir, target_id=target_id)
+                    filename = self.output_filename(model_base_dir=model_base_dir,
+                                                    target_id=target_id)
                     if not os.path.exists(filename):
                         raise FileNotFoundError(f"The model file '{filename}' does not exist. \
                                                 Ensure that the model is trained before \
@@ -705,22 +632,31 @@ class NNTrainer(OneShotTrainerInterface):
                     for model_idx, model in enumerate(models):
                         predictions[:, model_idx] = model(samples).cpu()
 
-                    all_predictions.extend(predictions.argmax(dim=1).tolist())
+                    all_predictions.extend(predictions.tolist())
                     all_targets.extend(targets.cpu().tolist())
 
             else:
                 raise NotImplementedError(f'TrainingStrategy has not is_trained implemented for \
                                         {self.training_strategy}')
 
-            df = pd.DataFrame({"Target": all_targets, "Prediction": all_predictions})
+            all_predictions = np.array(all_predictions)
+
+            df = pd.DataFrame({"Target": all_targets})
+            for idx in range(all_predictions.shape[1]):
+                df[f"Prediction_{idx}"] = all_predictions[:, idx]
+
+            prediction_columns = [col for col in df.columns if col.startswith('Prediction_')]
+            max_prediction_index = np.argmax(df[prediction_columns].to_numpy(),axis=1)
+            df_result = pd.DataFrame({'Prediction': max_prediction_index, 'Target': df['Target']})
+
             df.to_csv(output_file, index=False)
-            return df
+            return df_result
 
-
-class ForestTrainer(OneShotTrainerInterface):
+class RandomForestTrainer(BaseTrainer):
+    """Implementation of the BaseTrainer for training a RandomForest networks."""
 
     def __init__(self,
-                 training_strategy: TrainingStrategy,
+                 training_strategy: ModelTrainingStrategy,
                  trainer_id: str,
                  n_targets: int,
                  n_estimators=100,
@@ -732,8 +668,8 @@ class ForestTrainer(OneShotTrainerInterface):
 
     def fit(self,
             model_base_dir: str,
-            trn_dataset: torch_data.Dataset,
-            val_dataset: torch_data.Dataset) -> None:
+            trn_dataset: iara_dataset.BaseDataset,
+            val_dataset: iara_dataset.BaseDataset) -> None:
         """
         Method to fit (train) the model.
 
@@ -743,18 +679,18 @@ class ForestTrainer(OneShotTrainerInterface):
         Args:
             model_base_dir (str): The base directory to save any training-related outputs
                 or artifacts.
-            trn_dataset (torch_data.Dataset): The training dataset.
-            val_dataset (torch_data.Dataset): The validation dataset.
+            trn_dataset (iara_dataset.BaseDataset): The training dataset.
+            val_dataset (iara_dataset.BaseDataset): The validation dataset.
         """
         if self.is_trained(model_base_dir=model_base_dir):
             return
 
         os.makedirs(model_base_dir, exist_ok=True)
 
-        if self.training_strategy == TrainingStrategy.MULTICLASS:
+        if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
             target_ids = [None]
 
-        elif self.training_strategy == TrainingStrategy.CLASS_SPECIALIST:
+        elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
             target_ids = trn_dataset.classes
 
         samples = trn_dataset.data
@@ -763,7 +699,8 @@ class ForestTrainer(OneShotTrainerInterface):
             raise UnboundLocalError("Training dataset without data")
 
         for target_id in target_ids:
-            model_filename = self.model_name(model_base_dir=model_base_dir, target_id=target_id)
+            model_filename = self.output_filename(model_base_dir=model_base_dir,
+                                                  target_id=target_id)
 
             if os.path.exists(model_filename):
                 continue
@@ -785,9 +722,9 @@ class ForestTrainer(OneShotTrainerInterface):
             dataset_id: str,
             eval_base_dir: str,
             model_base_dir: typing.Optional[str] = None,
-            dataset: typing.Optional[torch_data.Dataset] = None) -> pd.DataFrame:
+            dataset: typing.Optional[iara_dataset.BaseDataset] = None) -> pd.DataFrame:
         """
-        Implementation of OneShotTrainerInterface.eval method, to eval the model using the
+        Implementation of BaseTrainer.eval method, to eval the model using the
             provided dataset.
 
         Args:
@@ -796,15 +733,15 @@ class ForestTrainer(OneShotTrainerInterface):
                 or artifacts.
             model_base_dir typing.Optional(str): The base directory to save read trained models
                 with non set the evaluation must already be done.
-            dataset typing.Optional(torch_data.Dataset): The dataset to evaluate with non set the
-                evaluation must already be done.
+            dataset typing.Optional(iara_dataset.BaseDataset): The dataset to evaluate with non set
+                the evaluation must already be done.
 
         Returns:
             pandas.DataFrame: DataFrame with two columns, ["Target", "Prediction"]
         """
         with torch.no_grad():
 
-            output_file = self.model_name(model_base_dir=eval_base_dir,
+            output_file = self.output_filename(model_base_dir=eval_base_dir,
                                            complement=dataset_id,
                                            extention='csv')
 
@@ -817,8 +754,8 @@ class ForestTrainer(OneShotTrainerInterface):
             targets = dataset.targets
             predictions = []
 
-            if self.training_strategy == TrainingStrategy.MULTICLASS:
-                filename = self.model_name(model_base_dir=model_base_dir)
+            if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
+                filename = self.output_filename(model_base_dir=model_base_dir)
                 if not os.path.exists(filename):
                     raise FileNotFoundError(f"The model file '{filename}' does not exist. Ensure \
                                             that the model is trained before evaluating.")
@@ -826,10 +763,11 @@ class ForestTrainer(OneShotTrainerInterface):
                 model = iara_model.BaseModel.load(filename)
                 predictions = model(samples)
 
-            elif self.training_strategy == TrainingStrategy.CLASS_SPECIALIST:
+            elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
                 models = []
                 for target_id in range(self.n_targets):
-                    filename = self.model_name(model_base_dir=model_base_dir, target_id=target_id)
+                    filename = self.output_filename(model_base_dir=model_base_dir,
+                                                    target_id=target_id)
                     if not os.path.exists(filename):
                         raise FileNotFoundError(f"The model file '{filename}' does not exist. \
                                                 Ensure that the model is trained before \
@@ -842,10 +780,6 @@ class ForestTrainer(OneShotTrainerInterface):
                 for model_idx, model in enumerate(models):
                     predictions[:, model_idx] = model(samples)
 
-                print('predictions: ', predictions)
-                print('predictions: ', predictions.shape)
-                print('predictions: ', predictions.dtype)
-
                 predictions = predictions.argmax(dim=1).tolist()
 
             else:
@@ -855,312 +789,3 @@ class ForestTrainer(OneShotTrainerInterface):
             df = pd.DataFrame({"Target": targets, "Prediction": predictions})
             df.to_csv(output_file, index=False)
             return df
-
-
-class Trainer():
-    """Class for managing and executing training based on a TrainingConfig"""
-
-    def __init__(self,
-                 config: TrainingConfig,
-                 trainer_list: typing.List[OneShotTrainerInterface]) -> None:
-        """
-        Args:
-            config (TrainingConfig): The training configuration.
-            trainer_list (typing.List[OneShotTrainerInterface]): A list of OneShotTrainerInterface
-                instances to be used for training and evaluation in this configuration.
-        """
-        self.config = config
-        self.trainer_list = trainer_list
-
-    def __str__(self) -> str:
-        return f'{self.config.name} with {len(self.trainer_list)} models'
-
-    def __prepare_output_dir(self):
-        """ Creates the directory tree for training, keeping backups of conflicting trainings. """
-        if os.path.exists(self.config.output_base_dir):
-            try:
-                old_config = TrainingConfig.load(self.config.output_base_dir, self.config.name)
-                if old_config.timestring == self.config.timestring:
-                    return
-
-                old_dir = os.path.join(self.config.output_base_dir, old_config.timestring)
-                os.makedirs(old_dir)
-
-                contents = os.listdir(self.config.output_base_dir)
-                for item in contents:
-                    item_path = os.path.join(self.config.output_base_dir, item)
-
-                    if os.path.isdir(item_path):
-                        try:
-                            datetime.datetime.strptime(item, TrainingConfig.time_str_format)
-                            continue
-                        except ValueError:
-                            pass
-                    shutil.move(item_path, old_dir)
-
-            except FileNotFoundError:
-                pass
-
-        os.makedirs(self.config.output_base_dir, exist_ok=True)
-        self.config.save(self.config.output_base_dir)
-
-    def is_trained(self, model_base_dir: str) -> bool:
-        """
-        Check if all trained models are saved in the specified directory.
-
-        Args:
-            model_base_dir (str): The directory where the trained models are expected to be saved.
-
-        Returns:
-            bool: True if all training is completed and models are saved in the directory,
-                False otherwise.
-        """
-        for trainer in self.trainer_list:
-            if not trainer.is_trained(model_base_dir):
-                return False
-        return True
-
-    def fit(self, i_fold: int,
-            trn_dataset_ids: typing.Iterable[int], trn_targets: typing.Iterable,
-            val_dataset_ids: typing.Iterable[int], val_targets: typing.Iterable) -> None:
-        """
-        Fit the model for a specified fold using the provided training and validation dataset IDs
-            and targets.
-
-        Args:
-            i_fold (int): The index of the fold.
-            trn_dataset_ids (typing.Iterable[int]): Iterable of training dataset IDs.
-            trn_targets (typing.Iterable): Iterable of training targets.
-            val_dataset_ids (typing.Iterable[int]): Iterable of validation dataset IDs.
-            val_targets (typing.Iterable): Iterable of validation targets.
-        """
-        iara.utils.set_seed()
-
-        model_base_dir = os.path.join(self.config.output_base_dir,
-                                        'model',
-                                        f'{i_fold}_of_{self.config.n_folds}')
-
-        if self.is_trained(model_base_dir):
-            return
-
-        # os.makedirs(model_base_dir, exist_ok=True)
-        # merged_df = pd.concat([trn_dataset_ids, trn_targets], axis=1)
-        # merged_df.to_csv(os.path.join(model_base_dir, 'merged_df.csv'), index=False)
-
-        trn_dataset = iara_data_proc.TorchDataset(self.config.dataset_processor,
-                                                    trn_dataset_ids,
-                                                    trn_targets)
-
-        val_dataset = iara_data_proc.TorchDataset(self.config.dataset_processor,
-                                                    val_dataset_ids,
-                                                    val_targets)
-
-        for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
-                            tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers"):
-            trainer.fit(model_base_dir=model_base_dir,
-                    trn_dataset=trn_dataset,
-                    val_dataset=val_dataset)
-
-    def is_evaluated(self, dataset_id: str, eval_base_dir: str) -> bool:
-        """
-        Check if all models are evaluated for the specified dataset_id in the specified directory.
-
-        Args:
-            dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
-            model_base_dir (str): The directory where the trained models are expected to be saved.
-
-        Returns:
-            bool: True if all models are evaluated in the directory,
-                False otherwise.
-        """
-        for trainer in self.trainer_list:
-            if not trainer.is_evaluated(dataset_id=dataset_id, eval_base_dir=eval_base_dir):
-                return False
-        return True
-
-    def eval(self, i_fold: int, dataset_id: str,
-            dataset_ids: typing.Iterable[int], targets: typing.Iterable) -> None:
-        """
-        Eval the model for a specified fold using the provided training and validation dataset IDs
-            and targets.
-
-        Args:
-            i_fold (int): The index of the fold.
-            dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
-            dataset_ids (typing.Iterable[int]): Iterable of evaluated dataset IDs.
-            targets (typing.Iterable): Iterable of evaluated targets.
-        """
-        model_base_dir = os.path.join(self.config.output_base_dir,
-                                        'model',
-                                        f'{i_fold}_of_{self.config.n_folds}')
-        eval_base_dir = os.path.join(self.config.output_base_dir,
-                                        'eval',
-                                        f'{i_fold}_of_{self.config.n_folds}')
-
-        if not self.is_trained(model_base_dir):
-            raise FileNotFoundError(f'Models not trained in {model_base_dir}')
-
-        if self.is_evaluated(dataset_id=dataset_id, eval_base_dir=eval_base_dir):
-            return
-
-        dataset = iara_data_proc.TorchDataset(self.config.dataset_processor,
-                                              dataset_ids,
-                                              targets)
-
-        for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
-                            tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers"):
-
-            trainer.eval(dataset_id=dataset_id,
-                         model_base_dir=model_base_dir,
-                         eval_base_dir=eval_base_dir,
-                         dataset=dataset)
-
-    def compile_results(self,
-                        dataset_id: str,
-                        trainer: OneShotTrainerInterface,
-                        only_first_fold: bool = False) -> typing.List[pd.DataFrame]:
-        """Compiles evaluated results for a specified trainer.
-
-        Args:
-            dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
-            trainer (OneShotTrainerInterface): An instance used for compilation in this
-                configuration.
-            only_first_fold (bool, optional): If True, retrieves the result of the first fold only.
-                Defaults to False.
-
-        Returns:
-            typing.List[pd.DataFrame]: List of DataFrame with two columns, ["Target", "Prediction"].
-        """
-        all_results = []
-        for i_fold in range(self.config.n_folds):
-            eval_base_dir = os.path.join(self.config.output_base_dir,
-                                            'eval',
-                                            f'{i_fold}_of_{self.config.n_folds}')
-
-            all_results.append(trainer.eval(dataset_id=dataset_id, eval_base_dir=eval_base_dir))
-
-            if only_first_fold:
-                break
-
-        return all_results
-
-    def run(self, only_first_fold: bool = False):
-        """Execute training based on the TrainingConfig"""
-
-        self.__prepare_output_dir()
-
-        _, trn_val_set_list = self.config.get_split_datasets()
-
-        for _ in tqdm.tqdm(range(1), leave=False, desc="Fitting models", bar_format = "{desc}"):
-            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if only_first_fold else \
-                                    tqdm.tqdm(trn_val_set_list,
-                                              leave=False,
-                                              desc="Fold")):
-
-                self.fit(i_fold=i_fold,
-                        trn_dataset_ids=trn_set['ID'],
-                        trn_targets=trn_set['Target'],
-                        val_dataset_ids=val_set['ID'],
-                        val_targets=val_set['Target'])
-
-                if only_first_fold:
-                    break
-
-        for _ in tqdm.tqdm(range(1), leave=False, desc="Evaluating models", bar_format = "{desc}"):
-            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if only_first_fold else \
-                                    tqdm.tqdm(trn_val_set_list,
-                                              leave=False,
-                                              desc="Fold")):
-
-                self.eval(i_fold=i_fold,
-                          dataset_id='val',
-                          dataset_ids=val_set['ID'],
-                          targets=val_set['Target'])
-
-                if only_first_fold:
-                    break
-
-        grid = iara_metrics.GridCompiler()
-
-        for trainer in self.trainer_list:
-            # print('Compiling results for ', trainer)
-
-            results = self.compile_results(dataset_id='val',
-                                          trainer=trainer,
-                                          only_first_fold=only_first_fold)
-
-            for i_fold, result in enumerate(results):
-
-                grid.add(grid_id=str(trainer),
-                         i_fold=i_fold,
-                         target=result['Target'],
-                         prediction=result['Prediction'])
-
-        print(f'\n______________{self.config.name}________________________')
-        print(grid.as_str())
-        print('----------------------------------------')
-
-
-class ModelComparator():
-    """
-    Class for comparing models based on cross-comparison in test datasets.
-
-    This class provides functionality to compare multiple models based on cross-comparison in test
-    datasets. It iterates through all combinations of two trainers from the provided list of
-    trainers, and evaluates each combination on the test dataset of the second trainer.
-    """
-    def __init__(self, output_dir: str, trainer_list: typing.List[Trainer]) -> None:
-        """
-        Args:
-            output_dir (str): The directory path where evaluation results will be saved.
-            trainer_list (List[Trainer]): A list of Trainer objects containing the models to be
-                compared.
-        """
-        self.output_dir = output_dir
-        self.trainer_list = trainer_list
-
-    def cross_compare_in_test(self, only_firs_fold: bool = False):
-        """
-        Perform cross-comparison of models on test datasets.
-
-        Iterates through all combinations of two trainers and evaluates each combination on the test
-        dataset of the second trainer.
-
-        Args:
-            only_firs_fold (bool, optional): If True, only evaluates the first fold of each trainer.
-                                             Defaults to False.
-        """
-        grid = iara_metrics.GridCompiler()
-
-        for trainer_1, trainer_2 in itertools.permutations(self.trainer_list, 2):
-
-            test_df1, _ = trainer_2.config.get_split_datasets()
-
-            dataset = iara_data_proc.TorchDataset(trainer_2.config.dataset_processor,
-                                                test_df1['ID'],
-                                                test_df1['Target'])
-
-            for trainer in trainer_1.trainer_list:
-
-                for i_fold in range(trainer_1.config.n_folds):
-                    model_base_dir = os.path.join(trainer_1.config.output_base_dir,
-                                            'model',
-                                            f'{i_fold}_of_{trainer_1.config.n_folds}')
-
-                    evaluation = trainer.eval(
-                        dataset_id=f'{trainer_2.config.name}_{str(trainer_1.config.name)}_{i_fold}',
-                        eval_base_dir = self.output_dir,
-                        model_base_dir = model_base_dir,
-                        dataset = dataset)
-
-                    grid.add(grid_id=f'{trainer_1.config.name} ({str(trainer)}) -> {trainer_2.config.name}',
-                             i_fold=i_fold,
-                             target=evaluation['Target'],
-                             prediction=evaluation['Prediction'])
-
-                    if only_firs_fold:
-                        break
-
-        print('\n______________Comparison________________________')
-        print(grid.as_str())
-        print('----------------------------------------')

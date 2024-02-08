@@ -8,11 +8,12 @@ In the future, this test script will be part of an application designed to creat
 import argparse
 import tqdm
 
-import iara.description
-import iara.ml.mlp as iara_model
-import iara.trainer as iara_trn
+import iara.records
+import iara.ml.experiment as iara_exp
+import iara.ml.models.mlp as iara_mlp
+import iara.ml.models.trainer as iara_trn
 import iara.processing.analysis as iara_proc
-import iara.processing.dataset as iara_data_proc
+import iara.processing.manager as iara_manager
 
 
 def main(override: bool, only_first_fold: bool, only_sample: bool):
@@ -24,49 +25,51 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
     config = False
     if not override:
         try:
-            config = iara_trn.TrainingConfig.load(config_dir, config_name)
+            config = iara_exp.Config.load(config_dir, config_name)
 
         except FileNotFoundError:
             pass
 
     if not config:
-        dataset = iara.description.CustomDataset(
-                        dataset_type = iara.description.DatasetType.OS_NEAR_CPA_IN,
-                        target = iara.description.DatasetTarget(
-                            column = 'TYPE',
-                            values = ['Cargo', 'Tanker', 'Tug'], # , 'Passenger'
-                            include_others = True
-                        ),
-                        only_sample=only_sample
-                    )
-        # dataset = iara.description.CustomDataset(
-        #                 dataset_type = iara.description.DatasetType.OS_CPA_IN,
-        #                 target = iara.description.DatasetTarget(
-        #                     column = 'DETAILED TYPE',
-        #                     values = ['Bulk Carrier', 'Container Ship'],
+        # dataset = iara.records.CustomCollection(
+        #                 collection = iara.records.Collection.OS_NEAR_CPA_IN,
+        #                 target = iara.records.Target(
+        #                     column = 'TYPE',
+        #                     values = ['Cargo', 'Tanker', 'Tug'], # , 'Passenger'
         #                     include_others = True
         #                 ),
-        #                 filters = [
-        #                     iara.description.DatasetFilter(
-        #                         column = 'Rain state',
-        #                         values = ['No rain']),
-        #                     iara.description.DatasetFilter(
-        #                         column = 'TYPE',
-        #                         values = ['Cargo']),
-        #                 ]
+        #                 only_sample=only_sample
         #             )
+        dataset = iara.records.CustomCollection(
+                        iara.records.Collection.OS_CPA_IN,
+                        iara.records.Target(
+                            column = 'DETAILED TYPE',
+                            values = ['Bulk Carrier', 'Container Ship'],
+                            include_others = True
+                        ),
+                        iara.records.LabelFilter(
+                                column = 'Rain state',
+                                values = ['No rain']),
+                        iara.records.LabelFilter(
+                                column = 'TYPE',
+                                values = ['Cargo']),
+                        only_sample=only_sample
+                    )
 
-        dp = iara_data_proc.DatasetProcessor(
+        dp = iara_manager.AudioFileProcessor(
             data_base_dir = "./data/raw_dataset",
             data_processed_base_dir = "./data/processed",
-            normalization = iara_proc.Normalization.MIN_MAX,
+            normalization = iara_proc.Normalization.NORM_L2,
             analysis = iara_proc.SpectralAnalysis.LOFAR,
-            n_pts = 640,
+            n_pts = 1024,
             n_overlap = 0,
             decimation_rate = 3,
+            frequency_limit=5e3,
+            integration_overlap=0,
+            integration_interval=1.024
         )
 
-        config = iara_trn.TrainingConfig(
+        config = iara_exp.Config(
                         name = config_name,
                         dataset = dataset,
                         dataset_processor = dp,
@@ -75,28 +78,28 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
 
         config.save(config_dir)
 
-    multiclass_trainer = iara_trn.NNTrainer(
-                                training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+    multiclass_trainer = iara_trn.OptimizerTrainer(
+                                training_strategy=iara_trn.ModelTrainingStrategy.MULTICLASS,
                                 trainer_id = 'MLP',
                                 n_targets = config.dataset.target.get_n_targets(),
                                 model_allocator=lambda input_shape, n_targets:
-                                        iara_model.MLP(input_shape=input_shape,
+                                        iara_mlp.MLP(input_shape=input_shape,
                                             n_neurons=128,
                                             n_targets=n_targets),
                                 batch_size = 128,
                                 n_epochs = 5)
 
-    specialist_trainer = iara_trn.NNTrainer(
-                                training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+    specialist_trainer = iara_trn.OptimizerTrainer(
+                                training_strategy=iara_trn.ModelTrainingStrategy.CLASS_SPECIALIST,
                                 trainer_id = 'MLP',
                                 n_targets = config.dataset.target.get_n_targets(),
                                 model_allocator=lambda input_shape, n_targets:
-                                        iara_model.MLP(input_shape=input_shape,
+                                        iara_mlp.MLP(input_shape=input_shape,
                                             n_neurons=128),
                                 batch_size = 128,
                                 n_epochs = 5)
 
-    trainer = iara_trn.Trainer(config=config, trainer_list=[multiclass_trainer, specialist_trainer])
+    trainer = iara_exp.Manager(config, multiclass_trainer, specialist_trainer)
 
     for _ in tqdm.tqdm(range(1), leave=False,
                        desc=" ########################### Training ###########################",

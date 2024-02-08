@@ -1,18 +1,15 @@
-"""Module for handling access to processed data from a dataset.
+"""Module for handling access to processed data from a audio dataset.
 
-This module defines a class, `DatasetProcessor`, which facilitates access
-to processed data by providing methods for loading and retrieving dataframes
-based on specified parameters. It supports the processing and normalization
-of audio data, allowing users to work with either window-based or image-based
-input types.
-
-Classes:
-    DatasetProcessor: Class for handling access to processed data from a dataset.
+This module defines a class, `AudioFileProcessor`, which facilitates access to processed data by
+providing methods for loading and retrieving dataframes based on specified parameters. It supports
+the processing and normalization of audio data, allowing users to work with either window-based or
+image-based input types.
 """
 import os
 import enum
 import typing
 import tqdm
+import json
 
 import PIL
 import pandas as pd
@@ -22,11 +19,10 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as color
 import tikzplotlib as tikz
 
-import torch
-import torch.utils.data as torch_data
-
+import iara.utils as iara_utils
 import iara.processing.analysis as iara_proc
-import iara.processing.prefered_number as iara_pn
+import iara.processing.prefered_numbers as iara_pn
+
 
 def get_iara_id(file:str) -> int:
     """
@@ -39,6 +35,7 @@ def get_iara_id(file:str) -> int:
         int: The extracted ID.
     """
     return int(file.rsplit('-',maxsplit=1)[-1])
+
 
 class PlotType(enum.Enum):
     """Enum defining plot types."""
@@ -58,7 +55,7 @@ class InputType(enum.Enum):
     def __str__(self):
         return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
 
-class DatasetProcessor():
+class AudioFileProcessor():
     """ Class for handling acess to process data from a dataset. """
 
     def __init__(self,
@@ -108,13 +105,53 @@ class DatasetProcessor():
 
         self.data_processed_dir = os.path.join(self.data_processed_base_dir,
                                   str(self.analysis) + "_" + str(self.input_type))
+        self._check_config()
 
-    def _find_raw_file(self, dataset_id: int) -> str:
+    def _to_dict(self) -> typing.Dict:
+        return {
+            'data_base_dir': self.data_base_dir,
+            'data_processed_base_dir': self.data_processed_base_dir,
+            'normalization': str(self.normalization),
+            'analysis': str(self.analysis),
+            'n_pts': self.n_pts,
+            'n_overlap': self.n_overlap,
+            'n_mels': self.n_mels,
+            'decimation_rate': self.decimation_rate,
+            'input_type': str(self.input_type),
+            'frequency_limit': self.frequency_limit,
+            'integration_overlap': self.integration_overlap,
+            'integration_interval': self.integration_interval,
+        }
+
+    def _save(self):
+        config_file = os.path.join(self.data_processed_base_dir, "config.json")
+        with open(config_file, "w", encoding="utf-8") as f:
+            json.dump(self._to_dict(), f, indent=4)
+
+    def _load_config(self) -> typing.Dict:
+        config_file = os.path.join(self.data_processed_base_dir, "config.json")
+        if not os.path.exists(config_file):
+            return None
+
+        with open(config_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+
+    def _check_config(self) -> None:
+        config = self._to_dict()
+        old_config = self._load_config()
+
+        if old_config is None or config == old_config:
+            return
+
+        iara_utils.backup_folder(self.data_processed_base_dir)
+        self._save()
+
+    def _find_raw_file(self, file_id: int) -> str:
         """
         Finds the raw file associated with the given ID.
 
         Parameters:
-            dataset_id (int): The ID to search for.
+            file_id (int): The ID to search for.
 
         Returns:
             str: The path to the raw file.
@@ -125,13 +162,13 @@ class DatasetProcessor():
         for root, _, files in os.walk(self.data_base_dir):
             for file in files:
                 filename, extension = os.path.splitext(file)
-                if extension == ".wav" and self.extract_id(filename) == dataset_id:
+                if extension == ".wav" and self.extract_id(filename) == file_id:
                     return os.path.join(root, file)
-        raise UnboundLocalError(f'file {dataset_id} not found in {self.data_base_dir}')
+        raise UnboundLocalError(f'file {file_id} not found in {self.data_base_dir}')
 
-    def _process(self, dataset_id: int) -> typing.Tuple[np.array, np.array, np.array]:
+    def _process(self, file_id: int) -> typing.Tuple[np.array, np.array, np.array]:
 
-        file = self._find_raw_file(dataset_id = dataset_id)
+        file = self._find_raw_file(file_id = file_id)
 
         fs, data = scipy_wav.read(file)
 
@@ -147,7 +184,9 @@ class DatasetProcessor():
                                                   integration_overlap = self.integration_overlap,
                                                   integration_interval = self.integration_interval)
 
+        print('self.normalization(power)')
         power = self.normalization(power)
+        print('  ')
 
         if self.frequency_limit:
             index_limit = next((i for i, freq in enumerate(freqs)
@@ -157,12 +196,12 @@ class DatasetProcessor():
 
         return power, freqs, times
 
-    def get_data(self, dataset_id: int) -> pd.DataFrame:
+    def get_data(self, file_id: int) -> pd.DataFrame:
         """
         Get data for the given ID.
 
         Parameters:
-            dataset_id (int): The ID to get data for.
+            file_id (int): The ID to get data for.
 
         Returns:
             pd.DataFrame: The DataFrame containing the processed data.
@@ -170,33 +209,33 @@ class DatasetProcessor():
         if self.input_type == InputType.WINDOW:
 
             os.makedirs(self.data_processed_dir, exist_ok=True)
-            dataset_file = os.path.join(self.data_processed_dir, f'{dataset_id}.pkl')
+            filename = os.path.join(self.data_processed_dir, f'{file_id}.pkl')
 
-            if os.path.exists(dataset_file):
-                return pd.read_pickle(dataset_file)
+            if os.path.exists(filename):
+                return pd.read_pickle(filename)
 
-            power, freqs, _ = self._process(dataset_id)
+            power, freqs, _ = self._process(file_id)
 
             columns = [f'f {i}' for i in range(len(freqs))]
             df = pd.DataFrame(power.T, columns=columns)
-            df.to_pickle(dataset_file)
+            df.to_pickle(filename)
 
             return df
 
         else:
             raise NotImplementedError(f'input type {str(self.input_type)} not implemented')
 
-    def get_training_df(self,
-                          dataset_ids: typing.Iterable[int],
-                          targets: typing.Iterable) -> typing.Tuple[pd.DataFrame, pd.Series]:
+    def get_complete_df(self,
+               file_ids: typing.Iterable[int],
+               targets: typing.Iterable) -> typing.Tuple[pd.DataFrame, pd.Series]:
         """
-        Retrieve data for the given dataset IDs.
+        Retrieve data for the given file IDs.
 
         Parameters:
-            - dataset_ids (Iterable[int]): The list of IDs to fetch data for;
+            - file_ids (Iterable[int]): The list of IDs to fetch data for;
                 a pd.Series of ints can be passed as well.
-            - targets (Iterable): List of target values corresponding to the dataset IDs.
-                Should have the same number of elements as dataset_ids.
+            - targets (Iterable): List of target values corresponding to the file IDs.
+                Should have the same number of elements as file_ids.
 
         Returns:
             Tuple[pd.DataFrame, pd.Series]:
@@ -208,7 +247,7 @@ class DatasetProcessor():
         result_target = pd.Series()
 
         for local_id, target in tqdm.tqdm(
-                                list(zip(dataset_ids, targets)), desc='Get data', leave=False):
+                                list(zip(file_ids, targets)), desc='Get data', leave=False):
             data_df = self.get_data(local_id)
             result_df = pd.concat([result_df, data_df], ignore_index=True)
 
@@ -217,25 +256,8 @@ class DatasetProcessor():
 
         return result_df, result_target
 
-    def get_training_pytorch_datasets(self,
-                                      dataset_ids: typing.Iterable[int],
-                                      targets: typing.Iterable) -> 'TorchDataset':
-        """
-        Retrieve data for the given dataset IDs.
-
-        Parameters:
-            - dataset_ids (Iterable[int]): The list of IDs to fetch data for;
-                a pd.Series of ints can be passed as well.
-            - targets (Iterable): List of target values corresponding to the dataset IDs.
-                Should have the same number of elements as dataset_ids.
-
-        Returns:
-            TorchDataset: torch.utils.data.Dataset to use in a DataLoader.
-        """
-        return TorchDataset(self, dataset_ids, targets)
-
     def plot(self,
-             dataset_id: typing.Union[int, typing.Iterable[int]],
+             file_id: typing.Union[int, typing.Iterable[int]],
              plot_type: PlotType = PlotType.EXPORT_PLOT,
              frequency_in_x_axis: bool=False,
              colormap: color.Colormap = plt.get_cmap('jet'),
@@ -244,7 +266,7 @@ class DatasetProcessor():
         Display or save images with processed data.
 
         Parameters:
-            dataset_id (Union[int, Iterable[int]]): ID or list of IDs of the dataset to plot.
+            file_id (Union[int, Iterable[int]]): ID or list of IDs of the file to plot.
             plot_type (PlotType): Type of plot to generate (default: PlotType.EXPORT_PLOT).
             frequency_in_x_axis (bool): If True, plot frequency values on the x-axis.
                 Default: False.
@@ -259,10 +281,10 @@ class DatasetProcessor():
                                       str(self.analysis) + "_" + str(plot_type))
             os.makedirs(output_dir, exist_ok=True)
 
-        if not isinstance(dataset_id, int):
-            for local_id in tqdm.tqdm(dataset_id, desc='Plot', leave=False):
+        if not isinstance(file_id, int):
+            for local_id in tqdm.tqdm(file_id, desc='Plot', leave=False):
                 self.plot(
-                    dataset_id = local_id,
+                    file_id = local_id,
                     plot_type = plot_type,
                     frequency_in_x_axis = frequency_in_x_axis,
                     colormap = colormap,
@@ -270,16 +292,16 @@ class DatasetProcessor():
             return
 
         if plot_type == PlotType.EXPORT_RAW or plot_type == PlotType.EXPORT_PLOT:
-            filename = os.path.join(output_dir,f'{dataset_id}.png')
+            filename = os.path.join(output_dir,f'{file_id}.png')
         elif plot_type == PlotType.EXPORT_TEX:
-            filename = os.path.join(output_dir,f'{dataset_id}.tex')
+            filename = os.path.join(output_dir,f'{file_id}.tex')
         else:
             filename = " "
 
         if os.path.exists(filename) and not override:
             return
 
-        power, freqs, times = self._process(dataset_id)
+        power, freqs, times = self._process(file_id)
 
         if frequency_in_x_axis:
             power = power.T
@@ -334,82 +356,3 @@ class DatasetProcessor():
         elif plot_type == PlotType.EXPORT_TEX:
             tikz.save(filename)
             plt.close()
-
-
-class TorchDataset(torch_data.Dataset):
-    """Custom dataset abstraction to bridge between torch.utils.data.Dataset and
-        pandas.DataFrame/pandas.Series.
-
-    This class facilitates the integration of PyTorch's DataLoader with data in the form of a
-        pandas.DataFrame and pandas.Series.
-
-    The MEMORY_LIMIT attribute specifies the maximum size (in bytes) of a dataframe that can be
-    loaded into memory. When a dataset exceeds this limit, the data is loaded partially as needed.
-    While this approach is less efficient, it reduces the likelihood of the dataset being closed
-    by the operating system due to memory constraints.
-    """
-    MEMORY_LIMIT = 2 * 1024 * 1024 * 1024  # gigabytes
-
-    def __init__(self,
-                 dataset_processor: DatasetProcessor,
-                 dataset_ids: typing.Iterable[int],
-                 targets: typing.Iterable) -> None:
-        """
-        Args:
-            - data (pd.DataFrame): Input data.
-            - target (pd.Series): Target corresponding to the input data.
-        """
-        self.data = pd.DataFrame()
-        self.targets = pd.Series()
-        self.classes = np.unique(targets)
-
-        self.dataset_processor = dataset_processor
-        self.dataset_ids = dataset_ids.values
-        self.limit_ids = [0]
-        self.last_id = -1
-        self.partial_data = []
-
-        total_memory = 0
-        for dataset_id, target in tqdm.tqdm(list(zip(dataset_ids, targets)),
-                                            desc='Loading dataset', leave=False):
-            data_df = self.dataset_processor.get_data(dataset_id)
-            self.limit_ids.append(self.limit_ids[-1] + len(data_df))
-
-            replicated_targets = pd.Series([target] * len(data_df), name='Target')
-            self.targets = pd.concat([self.targets, replicated_targets], ignore_index=True)
-
-            total_memory += data_df.memory_usage(deep=True).sum()
-
-            if total_memory > TorchDataset.MEMORY_LIMIT:
-                self.data = None
-            else:
-                self.data = pd.concat([self.data, data_df], ignore_index=True)
-
-        # # Uncomment to print total memory needed by keeping a dataset in memory
-        # unity = ['B', 'KB', 'MB', 'GB', 'TB']
-        # cont = 0
-        # while total_memory > 1024:
-        #     total_memory /= 1024
-        #     cont += 1
-        # print('total_memory: ', total_memory, unity[cont])
-
-        self.targets = torch.tensor(self.targets.values, dtype=torch.int64)
-
-        if self.data is not None:
-            self.data = torch.tensor(self.data.values, dtype=torch.float32)
-
-    def __len__(self):
-        return self.limit_ids[-1]
-
-    def __getitem__(self, index) -> typing.Tuple[torch.Tensor, torch.Tensor]:
-        if self.data is not None:
-            return self.data[index], self.targets[index]
-
-        current_id = next(i for i, valor in enumerate(self.limit_ids) if valor > index) - 1
-
-        if current_id != self.last_id:
-            self.last_id = current_id
-            self.partial_data = self.dataset_processor.get_data(self.dataset_ids[current_id])
-            self.partial_data = torch.tensor(self.partial_data.values, dtype=torch.float32)
-
-        return self.partial_data[index - self.limit_ids[current_id]], self.targets[index]

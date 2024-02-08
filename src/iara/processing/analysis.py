@@ -96,6 +96,7 @@ class Normalization(enum.Enum):
             return data/np.linalg.norm(data, ord=1, axis=0)
 
         if self == Normalization.NORM_L2:
+            data = Normalization.MIN_MAX.apply(data)
             return data/np.linalg.norm(data, ord=2, axis=0)
 
         raise UnboundLocalError(f"normalization {type:d} not implemented")
@@ -282,7 +283,7 @@ def log_melgram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0, 
     hop_length=n_fft-n_overlap
     discard=int(np.floor(n_fft/hop_length))
 
-    normalization = kwargs.get('norm', Normalization.NORM_L2)
+    normalization = Normalization.MIN_MAX_ZERO_CENTERED
 
     if decimation_rate > 1:
         data = sci.decimate(data, decimation_rate)

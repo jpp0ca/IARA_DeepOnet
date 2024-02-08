@@ -192,6 +192,9 @@ class CrossValidationCompiler():
             ret[i] = self.metric_as_str(metric, tex_format)
         return ret
 
+    def __str__(self) -> str:
+        return self.as_str()
+
 
 class GridCompiler():
     """Class for compiling grid search results.
@@ -225,7 +228,6 @@ class GridCompiler():
             target (Iterable[int]): True labels.
             prediction (Iterable[int]): Predicted labels.
         """
-
         if grid_id not in self.cv_dict:
             self.cv_dict[grid_id] = CrossValidationCompiler()
 
@@ -279,3 +281,6 @@ class GridCompiler():
         return CrossValidationCompiler.table_to_str(
             self.as_table(tex_format=tex_format)
         )
+
+    def __str__(self) -> str:
+        return self.as_str()

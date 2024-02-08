@@ -1,10 +1,12 @@
 """
 Utils Module
 
-This module provides utility functions for handling device availability,
-setting random seed for reproducibility, and printing information about available devices.
+This module provides utility functions
 """
 import random
+import os
+import shutil
+import datetime
 
 import numpy as np
 
@@ -35,3 +37,26 @@ def set_seed():
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
+
+def backup_folder(base_dir, time_str_format = "%Y%m%d-%H%M%S"):
+    """Method to backup all files in a folder in a timestamp based folder
+
+    Args:
+        base_dir (_type_): Directory to backup
+        time_str_format (str, optional): Time string format for the folder.
+            Defaults to "%Y%m%d-%H%M%S".
+    """
+    backup_dir = os.path.join(base_dir, datetime.datetime.now().strftime(time_str_format))
+    os.makedirs(backup_dir)
+
+    contents = os.listdir(base_dir)
+    for item in contents:
+        item_path = os.path.join(base_dir, item)
+
+        if os.path.isdir(item_path):
+            try:
+                datetime.datetime.strptime(item, time_str_format)
+                continue
+            except ValueError:
+                pass
+        shutil.move(item_path, backup_dir)

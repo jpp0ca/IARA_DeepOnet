@@ -15,11 +15,12 @@ import argparse
 
 import torch
 
-import iara.description
-import iara.ml.mlp as iara_model
-import iara.trainer as iara_trn
+import iara.records
+import iara.ml.models.mlp as iara_mlp
+import iara.ml.experiment as iara_exp
+import iara.ml.models.trainer as iara_trn
 import iara.processing.analysis as iara_proc
-import iara.processing.dataset as iara_data_proc
+import iara.processing.manager as iara_manager
 
 
 def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int):
@@ -29,13 +30,13 @@ def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int
 
     if cpa_test == 1:
         configs = {
-            'near_cpa': iara.description.DatasetType.OS_NEAR_CPA_IN,
-            'far_cpa': iara.description.DatasetType.OS_FAR_CPA_IN,
+            'near_cpa': iara.records.Collection.OS_NEAR_CPA_IN,
+            'far_cpa': iara.records.Collection.OS_FAR_CPA_IN,
         }
     elif cpa_test == 2:
         configs = {
-            'cpa_in': iara.description.DatasetType.OS_CPA_IN,
-            'cpa_out': iara.description.DatasetType.OS_CPA_OUT
+            'cpa_in': iara.records.Collection.OS_CPA_IN,
+            'cpa_out': iara.records.Collection.OS_CPA_OUT
         }
     else:
         print('Not implemented test')
@@ -43,21 +44,21 @@ def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int
 
     config = False
     trainer_list = []
-    for config_name, data_type in configs.items():
+    for config_name, collection in configs.items():
 
         config = False
         if not override:
             try:
-                config = iara_trn.TrainingConfig.load(config_dir, config_name if not only_sample\
+                config = iara_exp.Config.load(config_dir, config_name if not only_sample\
                                         else f"{config_name}_sample")
 
             except FileNotFoundError:
                 pass
 
         if not config:
-            dataset = iara.description.CustomDataset(
-                            dataset_type = data_type,
-                            target = iara.description.DatasetTarget(
+            custom_collection = iara.records.CustomCollection(
+                            collection = collection,
+                            target = iara.records.Target(
                                 column = 'TYPE',
                                 values = ['Cargo', 'Tanker', 'Tug'],
                                 include_others = True
@@ -65,7 +66,7 @@ def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int
                             only_sample=only_sample
                         )
 
-            dp = iara_data_proc.DatasetProcessor(
+            dp = iara_manager.AudioFileProcessor(
                 data_base_dir = "./data/raw_dataset",
                 data_processed_base_dir = "./data/processed",
                 normalization = iara_proc.Normalization.NORM_L2,
@@ -78,33 +79,32 @@ def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int
                 integration_interval=1.024
             )
 
-            config = iara_trn.TrainingConfig(
+            config = iara_exp.Config(
                             name = config_name,
-                            dataset = dataset,
+                            dataset = custom_collection,
                             dataset_processor = dp,
                             output_base_dir = "./results/trainings/cpa_analysis" if not only_sample\
                                         else "./results/trainings/cpa_analysis_sample" ,
-                            n_folds=10 if not only_sample else 3,
-                            test_factor=0.2)
+                            n_folds=10 if not only_sample else 3)
 
             config.save(config_dir)
 
-        oneshot_trainer_list = []
+        trainer_list = []
 
 
-        oneshot_trainer_list.append(iara_trn.ForestTrainer(
-                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+        trainer_list.append(iara_trn.RandomForestTrainer(
+                                    training_strategy=iara_trn.ModelTrainingStrategy.MULTICLASS,
                                     trainer_id = 'RandomForest',
                                     n_targets = config.dataset.target.get_n_targets(),
                                     n_estimators=100,
                                     max_depth=None))
 
-        oneshot_trainer_list.append(iara_trn.NNTrainer(
-                                    training_strategy=iara_trn.TrainingStrategy.MULTICLASS,
+        trainer_list.append(iara_trn.OptimizerTrainer(
+                                    training_strategy=iara_trn.ModelTrainingStrategy.MULTICLASS,
                                     trainer_id = 'MLP',
                                     n_targets = config.dataset.target.get_n_targets(),
                                     model_allocator=lambda input_shape, n_targets:
-                                        iara_model.MLP(input_shape=input_shape,
+                                        iara_mlp.MLP(input_shape=input_shape,
                                             n_neurons=64,
                                             n_targets=n_targets),
                                     optimizer_allocator=lambda model:
@@ -113,29 +113,29 @@ def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int
                                     n_epochs = 256,
                                     patience=8))
 
-        oneshot_trainer_list.append(iara_trn.ForestTrainer(
-                                    training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+        trainer_list.append(iara_trn.RandomForestTrainer(
+                                    training_strategy=iara_trn.ModelTrainingStrategy.CLASS_SPECIALIST,
                                     trainer_id = 'RandomForest',
                                     n_targets = config.dataset.target.get_n_targets(),
                                     n_estimators=100,
                                     max_depth=None))
 
-        oneshot_trainer_list.append(iara_trn.NNTrainer(
-                                    training_strategy=iara_trn.TrainingStrategy.CLASS_SPECIALIST,
+        trainer_list.append(iara_trn.OptimizerTrainer(
+                                    training_strategy=iara_trn.ModelTrainingStrategy.CLASS_SPECIALIST,
                                     trainer_id = 'MLP',
                                     n_targets = config.dataset.target.get_n_targets(),
                                     model_allocator=lambda input_shape, _:
-                                        iara_model.MLP(input_shape=input_shape,
+                                        iara_mlp.MLP(input_shape=input_shape,
                                             n_neurons=64),
                                     batch_size = 128,
                                     n_epochs = 256,
                                     patience=None))
 
-        trainer_list.append(iara_trn.Trainer(config=config, trainer_list=oneshot_trainer_list))
+        trainer_list.append(iara_exp.Manager(config, *trainer_list))
 
         trainer_list[-1].run(only_first_fold = only_first_fold)
 
-    comparator = iara_trn.ModelComparator(
+    comparator = iara_exp.Comparator(
                             output_dir= "./results/comparisons/cpa_analysis",
                             trainer_list=trainer_list)
 
