@@ -278,7 +278,7 @@ class Manager():
 
         return all_results
 
-    def run(self, only_first_fold: bool = False):
+    def run(self, only_first_fold: bool = False) -> typing.Dict:
         """Execute training based on the Config"""
 
         self.__prepare_output_dir()
@@ -314,25 +314,17 @@ class Manager():
                 if only_first_fold:
                     break
 
-        grid = iara_metrics.GridCompiler()
+        result_dict = {}
 
         for trainer in self.trainer_list:
-            # print('Compiling results for ', trainer)
 
             results = self.compile_results(dataset_id='val',
                                           trainer=trainer,
                                           only_first_fold=only_first_fold)
 
-            for i_fold, result in enumerate(results):
+            result_dict[trainer.trainer_id] = results
 
-                grid.add(grid_id=str(trainer),
-                         i_fold=i_fold,
-                         target=result['Target'],
-                         prediction=result['Prediction'])
-
-        print(f'\n______________{self.config.name}________________________')
-        print(grid.as_str())
-        print('----------------------------------------')
+        return result_dict
 
 
 class Comparator():

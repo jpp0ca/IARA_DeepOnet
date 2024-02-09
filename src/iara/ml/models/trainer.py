@@ -28,7 +28,7 @@ import iara.ml.dataset as iara_dataset
 
 class ModelTrainingStrategy(enum.Enum):
     """Enum defining model training strategies."""
-    CLASS_SPECIALIST =0,
+    CLASS_SPECIALIST =0
     MULTICLASS=1
 
     def default_loss(self, class_weights: torch.Tensor) -> torch.nn.Module:

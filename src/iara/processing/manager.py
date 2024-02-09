@@ -184,9 +184,7 @@ class AudioFileProcessor():
                                                   integration_overlap = self.integration_overlap,
                                                   integration_interval = self.integration_interval)
 
-        print('self.normalization(power)')
         power = self.normalization(power)
-        print('  ')
 
         if self.frequency_limit:
             index_limit = next((i for i, freq in enumerate(freqs)

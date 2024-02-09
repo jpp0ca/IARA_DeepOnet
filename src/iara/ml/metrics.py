@@ -212,10 +212,12 @@ class GridCompiler():
                 Defaults to all Metrics available.
         """
         self.cv_dict = {}
+        self.param_dict = {}
+        self.params = None
         self.metric_list = metric_list
 
     def add(self,
-            grid_id: str,
+            params: typing.Dict,
             i_fold: int,
             target: typing.Iterable[int],
             prediction: typing.Iterable[int]) -> None:
@@ -228,13 +230,20 @@ class GridCompiler():
             target (Iterable[int]): True labels.
             prediction (Iterable[int]): Predicted labels.
         """
-        if grid_id not in self.cv_dict:
-            self.cv_dict[grid_id] = CrossValidationCompiler()
+        params_hash = hash(tuple(params.items()))
+        self.params = params.keys()
 
-        self.cv_dict[grid_id].add(i_fold = i_fold,
-                                  metric_list = self.metric_list,
-                                  target = target,
-                                  prediction = prediction)
+        if not params_hash in self.cv_dict:
+            self.cv_dict[params_hash]  = {
+                'params': params,
+                'cv': CrossValidationCompiler(),
+            }
+            self.param_dict[params_hash] = params
+
+        self.cv_dict[params_hash]['cv'].add(i_fold = i_fold,
+                                metric_list = self.metric_list,
+                                target = target,
+                                prediction = prediction)
 
     def as_table(self, tex_format=False) -> typing.List[typing.List[str]]:
         """
@@ -246,22 +255,27 @@ class GridCompiler():
         Returns:
             List[List[str]]: Formatted table representation of the compiled results.
         """
-        table = [[''] * (1 + len(self.metric_list)) for _ in range(len(self.cv_dict)+1)]
+        table = [[''] * (len(self.params) + len(self.metric_list)) for _ in range(len(self.cv_dict)+1)]
 
-        j = 1
+        j = 0
+        for param in self.params:
+            table[0][j] = str(param).replace('_', ' ')
+            j = j + 1
+
         for metric in self.metric_list:
             table[0][j] = metric.as_label()
             j += 1
 
         i = 1
-        for grid_id, cv_compiler in self.cv_dict.items():
+        for _, cv_dict in self.cv_dict.items():
             j = 0
 
-            table[i][j] = grid_id
-            j += 1
+            for _, param_value in cv_dict['params'].items():
+                table[i][j] = str(param_value)
+                j = j+1
 
             for metric in self.metric_list:
-                table[i][j] = cv_compiler.metric_as_str(metric, tex_format=tex_format)
+                table[i][j] = cv_dict['cv'].metric_as_str(metric, tex_format=tex_format)
                 j += 1
 
             i += 1

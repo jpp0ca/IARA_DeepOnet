@@ -246,12 +246,12 @@ class Target(LabelFilter):
         if not self.include_others:
             input_df = super().apply(input_df)
 
+        input_df = input_df.assign(**{self.DEFAULT_TARGET_HEADER:
+            input_df[self.column].map({value: index for index, value in enumerate(self.values)})})
         input_df[self.DEFAULT_TARGET_HEADER] = \
-                input_df[self.column].map({value: index for index, value in enumerate(self.values)})
+            input_df[self.DEFAULT_TARGET_HEADER].fillna(len(self.values))
         input_df[self.DEFAULT_TARGET_HEADER] = \
-                input_df[self.DEFAULT_TARGET_HEADER].fillna(len(self.values))
-        input_df[self.DEFAULT_TARGET_HEADER] = \
-                input_df[self.DEFAULT_TARGET_HEADER].astype(int)
+            input_df[self.DEFAULT_TARGET_HEADER].astype(int)
         return input_df
 
 class CustomCollection:
