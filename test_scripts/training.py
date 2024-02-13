@@ -5,6 +5,7 @@ This script generates a sample training configuration for testing functionality.
 In the future, this test script will be part of an application designed to create training
     configurations as described in the associated article.
 """
+import typing
 import argparse
 import tqdm
 
@@ -16,7 +17,7 @@ import iara.processing.analysis as iara_proc
 import iara.processing.manager as iara_manager
 
 
-def main(override: bool, only_first_fold: bool, only_sample: bool):
+def main(override: bool, folds: typing.List[int], only_sample: bool):
     """Main function for the test Training Configuration."""
 
     config_dir = "./results/configs"
@@ -104,17 +105,28 @@ def main(override: bool, only_first_fold: bool, only_sample: bool):
     for _ in tqdm.tqdm(range(1), leave=False,
                        desc=" ########################### Training ###########################",
                        bar_format = "{desc}"):
-        trainer.run(only_first_fold = only_first_fold)
+        trainer.run(folds = folds)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='RUN Training test')
     parser.add_argument('--override', action='store_true', default=False,
                         help='Ignore old runs')
-    parser.add_argument('--only_first_fold', action='store_true', default=False,
-                        help='Execute only first fold. For inspection purpose')
     parser.add_argument('--only_sample', action='store_true', default=False,
                         help='Execute only in sample_dataset. For quick training and test.')
+    parser.add_argument('--fold', type=str, default='',
+                        help='Specify folds to be executed. Example: 0,4-7')
 
     args = parser.parse_args()
-    main(args.override, args.only_first_fold, args.only_sample)
+
+    folds_to_execute = []
+    if args.fold:
+        fold_ranges = args.fold.split(',')
+        for fold_range in fold_ranges:
+            if '-' in fold_range:
+                start, end = map(int, fold_range.split('-'))
+                folds_to_execute.extend(range(start, end + 1))
+            else:
+                folds_to_execute.append(int(fold_range))
+
+    main(args.override, folds_to_execute, args.only_sample)

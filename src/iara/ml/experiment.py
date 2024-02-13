@@ -252,33 +252,35 @@ class Manager():
     def compile_results(self,
                         dataset_id: str,
                         trainer: iara_trainer.BaseTrainer,
-                        only_first_fold: bool = False) -> typing.List[pd.DataFrame]:
+                        folds: typing.List[int] = None) -> typing.List[pd.DataFrame]:
         """Compiles evaluated results for a specified trainer.
 
         Args:
             dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
             trainer (BaseTrainer): An instance used for compilation in this
                 configuration.
-            only_first_fold (bool, optional): If True, retrieves the result of the first fold only.
-                Defaults to False.
+            folds (List[int], optional): List of fold to be evaluated.
+                Defaults all folds will be executed.
 
         Returns:
             typing.List[pd.DataFrame]: List of DataFrame with two columns, ["Target", "Prediction"].
         """
         all_results = []
         for i_fold in range(self.config.n_folds):
+
+            if folds and i_fold not in folds:
+                continue
+
             eval_base_dir = os.path.join(self.config.output_base_dir,
                                             'eval',
                                             f'{i_fold}_of_{self.config.n_folds}')
 
             all_results.append(trainer.eval(dataset_id=dataset_id, eval_base_dir=eval_base_dir))
 
-            if only_first_fold:
-                break
 
         return all_results
 
-    def run(self, only_first_fold: bool = False) -> typing.Dict:
+    def run(self, folds: typing.List[int] = None) -> typing.Dict:
         """Execute training based on the Config"""
 
         self.__prepare_output_dir()
@@ -286,10 +288,13 @@ class Manager():
         _, trn_val_set_list = self.config.split_datasets()
 
         for _ in tqdm.tqdm(range(1), leave=False, desc="Fitting models", bar_format = "{desc}"):
-            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if only_first_fold else \
+            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if not folds else \
                                     tqdm.tqdm(trn_val_set_list,
                                               leave=False,
                                               desc="Fold")):
+
+                if folds and i_fold not in folds:
+                    continue
 
                 self.fit(i_fold=i_fold,
                         trn_dataset_ids=trn_set['ID'],
@@ -297,22 +302,20 @@ class Manager():
                         val_dataset_ids=val_set['ID'],
                         val_targets=val_set['Target'])
 
-                if only_first_fold:
-                    break
-
         for _ in tqdm.tqdm(range(1), leave=False, desc="Evaluating models", bar_format = "{desc}"):
-            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if only_first_fold else \
+            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if not folds else \
                                     tqdm.tqdm(trn_val_set_list,
                                               leave=False,
                                               desc="Fold")):
+
+                if folds and i_fold not in folds:
+                    continue
 
                 self.eval(i_fold=i_fold,
                           dataset_id='val',
                           dataset_ids=val_set['ID'],
                           targets=val_set['Target'])
 
-                if only_first_fold:
-                    break
 
         result_dict = {}
 
@@ -320,7 +323,7 @@ class Manager():
 
             results = self.compile_results(dataset_id='val',
                                           trainer=trainer,
-                                          only_first_fold=only_first_fold)
+                                          folds=folds)
 
             result_dict[trainer.trainer_id] = results
 
@@ -345,7 +348,7 @@ class Comparator():
         self.output_dir = output_dir
         self.trainer_list = trainer_list
 
-    def cross_compare_in_test(self, only_firs_fold: bool = False):
+    def cross_compare_in_test(self, folds: typing.List[int] = None):
         """
         Perform cross-comparison of models on test datasets.
 
@@ -353,8 +356,8 @@ class Comparator():
         dataset of the second trainer.
 
         Args:
-            only_firs_fold (bool, optional): If True, only evaluates the first fold of each trainer.
-                                             Defaults to False.
+            folds (List[int], optional): List of fold to be evaluated.
+                Defaults all folds will be executed.
         """
         grid = iara_metrics.GridCompiler()
 
@@ -369,6 +372,10 @@ class Comparator():
             for trainer in trainer_1.trainer_list:
 
                 for i_fold in range(trainer_1.config.n_folds):
+
+                    if folds and i_fold not in folds:
+                        continue
+
                     model_base_dir = os.path.join(trainer_1.config.output_base_dir,
                                             'model',
                                             f'{i_fold}_of_{trainer_1.config.n_folds}')
@@ -379,14 +386,11 @@ class Comparator():
                         model_base_dir = model_base_dir,
                         dataset = dataset)
 
-                    grid.add(grid_id=f'{trainer_1.config.name} ({str(trainer)}) \
-                                -> {trainer_2.config.name}',
+                    grid.add(params={'': f'{trainer_1.config.name} ({str(trainer)}) \
+                                -> {trainer_2.config.name}'},
                              i_fold=i_fold,
                              target=evaluation['Target'],
                              prediction=evaluation['Prediction'])
-
-                    if only_firs_fold:
-                        break
 
         print('\n______________Comparison________________________')
         print(grid.as_str())

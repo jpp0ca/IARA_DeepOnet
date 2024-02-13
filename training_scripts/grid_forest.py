@@ -8,6 +8,7 @@ metrics.
 
 The chosen configuration will then be used for further training and analysis in the article.
 """
+import typing
 import itertools
 import argparse
 
@@ -20,7 +21,7 @@ import iara.default as iara_default
 from iara.default import DEFAULT_DIRECTORIES
 
 def main(override: bool,
-        only_first_fold: bool,
+        folds: typing.List[int],
         only_sample: bool,
         include_other: bool,
         training_strategy: iara_trn.ModelTrainingStrategy):
@@ -88,7 +89,7 @@ def main(override: bool,
 
         manager = iara_exp.Manager(config, *mlp_trainers)
 
-        result_dict = manager.run(only_first_fold = only_first_fold)
+        result_dict = manager.run(folds = folds)
 
         grid = iara_metrics.GridCompiler()
         for trainer_id, results in result_dict.items():
@@ -106,24 +107,35 @@ def main(override: bool,
 if __name__ == "__main__":
     strategy_str_list = [str(i) for i in iara_trn.ModelTrainingStrategy]
 
-    parser = argparse.ArgumentParser(description='RUN MLP grid search analysis')
+    parser = argparse.ArgumentParser(description='RUN RandomForest grid search analysis')
     parser.add_argument('--override', action='store_true', default=False,
                         help='Ignore old runs')
-    parser.add_argument('--only_first_fold', action='store_true', default=False,
-                        help='Execute only first fold. For inspection purpose')
     parser.add_argument('--only_sample', action='store_true', default=False,
                         help='Execute only in sample_dataset. For quick training and test.')
     parser.add_argument('--exclude_other', action='store_true', default=False,
                         help='Include records besides than [Cargo, Tanker, Tug] in training.')
     parser.add_argument('--training_strategy', type=str, choices=strategy_str_list,
                         default=None, help='Strategy for training the model')
+    parser.add_argument('--fold', type=str, default='',
+                        help='Specify folds to be executed. Example: 0,4-7')
 
     args = parser.parse_args()
+
+    folds_to_execute = []
+    if args.fold:
+        fold_ranges = args.fold.split(',')
+        for fold_range in fold_ranges:
+            if '-' in fold_range:
+                start, end = map(int, fold_range.split('-'))
+                folds_to_execute.extend(range(start, end + 1))
+            else:
+                folds_to_execute.append(int(fold_range))
+
     if args.training_strategy is not None:
         index = strategy_str_list.index(args.training_strategy)
         print(iara_trn.ModelTrainingStrategy(index))
         main(override = args.override,
-            only_first_fold = args.only_first_fold,
+            folds = folds_to_execute,
             only_sample = args.only_sample,
             include_other = not args.exclude_other,
             training_strategy = iara_trn.ModelTrainingStrategy(index))
@@ -131,7 +143,7 @@ if __name__ == "__main__":
     else:
         for strategy in iara_trn.ModelTrainingStrategy:
             main(override = args.override,
-                only_first_fold = args.only_first_fold,
+                folds = folds_to_execute,
                 only_sample = args.only_sample,
                 include_other = not args.exclude_other,
                 training_strategy = strategy)

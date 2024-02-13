@@ -11,6 +11,7 @@ This script generates two tests:
    - Classifier trained on OS_CPA_IN data and evaluated on OS_CPA_OUT data.
    - Classifier trained on OS_CPA_OUT data and evaluated on OS_CPA_IN data.
 """
+import typing
 import argparse
 
 import torch
@@ -23,7 +24,7 @@ import iara.processing.analysis as iara_proc
 import iara.processing.manager as iara_manager
 
 
-def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int):
+def main(override: bool, folds: typing.List[int], only_sample: bool, cpa_test: int):
     """Main function for the CPA analysis script."""
 
     config_dir = "./results/configs"
@@ -133,13 +134,13 @@ def main(override: bool, only_first_fold: bool, only_sample: bool, cpa_test: int
 
         trainer_list.append(iara_exp.Manager(config, *trainer_list))
 
-        trainer_list[-1].run(only_first_fold = only_first_fold)
+        trainer_list[-1].run(folds = folds)
 
     comparator = iara_exp.Comparator(
                             output_dir= "./results/comparisons/cpa_analysis",
                             trainer_list=trainer_list)
 
-    comparator.cross_compare_in_test(only_firs_fold=only_first_fold)
+    comparator.cross_compare_in_test(folds = folds)
 
 
 
@@ -147,8 +148,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='RUN CPA analysis')
     parser.add_argument('--override', action='store_true', default=False,
                         help='Ignore old runs')
-    parser.add_argument('--only_first_fold', action='store_true', default=False,
-                        help='Execute only first fold. For inspection purpose')
     parser.add_argument('--only_sample', action='store_true', default=False,
                         help='Execute only in sample_dataset. For quick training and test.')
     test_choices=[1, 2]
@@ -156,10 +155,23 @@ if __name__ == "__main__":
                         help='Choose test option\
                             [1. Impact of the closest point for CPA,\
                             2. Impact of records containing CPA]')
+    parser.add_argument('--fold', type=str, default='',
+                        help='Specify folds to be executed. Example: 0,4-7')
 
     args = parser.parse_args()
+
+    folds_to_execute = []
+    if args.fold:
+        fold_ranges = args.fold.split(',')
+        for fold_range in fold_ranges:
+            if '-' in fold_range:
+                start, end = map(int, fold_range.split('-'))
+                folds_to_execute.extend(range(start, end + 1))
+            else:
+                folds_to_execute.append(int(fold_range))
+
     if args.cpa_test == 0:
         for n_test in test_choices:
-            main(args.override, args.only_first_fold, args.only_sample, n_test)
+            main(args.override, folds_to_execute, args.only_sample, n_test)
     else:
-        main(args.override, args.only_first_fold, args.only_sample, args.cpa_test)
+        main(args.override, folds_to_execute, args.only_sample, args.cpa_test)
