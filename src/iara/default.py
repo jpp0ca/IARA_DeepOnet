@@ -1,4 +1,8 @@
+import torch
 
+import iara.ml.experiment as iara_exp
+import iara.ml.models.mlp as iara_mlp
+import iara.ml.models.trainer as iara_trn
 import iara.processing.analysis as iara_proc
 import iara.processing.manager as iara_manager
 
@@ -49,3 +53,37 @@ def default_deepship_audio_processor(directories: Directories = DEFAULT_DEEPSHIP
         integration_overlap=0,
         integration_interval=1.024
     )
+
+def default_trainers(config: iara_exp.Config):
+    """Get trainers for all the best models in the grid search configuration
+
+    Args:
+        config (iara_exp.Config): Training configuration
+    """
+
+    trainers = []
+
+    for training_type in iara_trn.ModelTrainingStrategy:
+        trainers.append(iara_trn.OptimizerTrainer(
+                training_strategy=training_type,
+                trainer_id = f'mlp_{str(training_type)}',
+                n_targets = config.dataset.target.get_n_targets(),
+                model_allocator=lambda input_shape, n_targets:
+                        iara_mlp.MLP(input_shape=input_shape,
+                            n_neurons=256,
+                            n_targets=n_targets,
+                            activation_hidden_layer=torch.nn.PReLU()),
+                optimizer_allocator=lambda model:
+                    torch.optim.Adam(model.parameters(), lr=5e-5),
+                batch_size = 128,
+                n_epochs = 512,
+                patience=32))
+
+    for training_type in iara_trn.ModelTrainingStrategy:
+        trainers.append(iara_trn.RandomForestTrainer(
+                                    training_strategy=training_type,
+                                    trainer_id = f'forest_{str(training_type)}',
+                                    n_targets = config.dataset.target.get_n_targets(),
+                                    n_estimators = 100))
+
+    return trainers

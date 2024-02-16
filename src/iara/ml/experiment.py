@@ -288,7 +288,7 @@ class Manager():
         _, trn_val_set_list = self.config.split_datasets()
 
         for _ in tqdm.tqdm(range(1), leave=False, desc="Fitting models", bar_format = "{desc}"):
-            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if not folds else \
+            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if len(folds) == 1 else \
                                     tqdm.tqdm(trn_val_set_list,
                                               leave=False,
                                               desc="Fold")):
@@ -303,7 +303,7 @@ class Manager():
                         val_targets=val_set['Target'])
 
         for _ in tqdm.tqdm(range(1), leave=False, desc="Evaluating models", bar_format = "{desc}"):
-            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if not folds else \
+            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if len(folds) == 1 else \
                                     tqdm.tqdm(trn_val_set_list,
                                               leave=False,
                                               desc="Fold")):
