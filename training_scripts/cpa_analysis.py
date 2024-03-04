@@ -23,11 +23,17 @@ import iara.ml.models.trainer as iara_trn
 import iara.processing.analysis as iara_proc
 import iara.processing.manager as iara_manager
 
+import iara.default as iara_default
+from iara.default import DEFAULT_DIRECTORIES
+
+
 
 def main(override: bool, folds: typing.List[int], only_sample: bool, cpa_test: int):
     """Main function for the CPA analysis script."""
 
-    config_dir = "./results/configs"
+    cpa_str = 'cpa_analysis' if not only_sample else 'cpa_analysis_sample'
+
+    config_dir = f"{DEFAULT_DIRECTORIES.config_dir}/{cpa_str}"
 
     if cpa_test == 1:
         configs = {
@@ -44,14 +50,13 @@ def main(override: bool, folds: typing.List[int], only_sample: bool, cpa_test: i
         return
 
     config = False
-    trainer_list = []
+    managers = []
     for config_name, collection in configs.items():
 
         config = False
         if not override:
             try:
-                config = iara_exp.Config.load(config_dir, config_name if not only_sample\
-                                        else f"{config_name}_sample")
+                config = iara_exp.Config.load(config_dir, config_name)
 
             except FileNotFoundError:
                 pass
@@ -67,78 +72,28 @@ def main(override: bool, folds: typing.List[int], only_sample: bool, cpa_test: i
                             only_sample=only_sample
                         )
 
-            dp = iara_manager.AudioFileProcessor(
-                data_base_dir = "./data/raw_dataset",
-                data_processed_base_dir = "./data/processed",
-                normalization = iara_proc.Normalization.NORM_L2,
-                analysis = iara_proc.SpectralAnalysis.LOFAR,
-                n_pts = 1024,
-                n_overlap = 0,
-                decimation_rate = 3,
-                frequency_limit=5e3,
-                integration_overlap=0,
-                integration_interval=1.024
-            )
+            output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{cpa_str}"
 
             config = iara_exp.Config(
                             name = config_name,
                             dataset = custom_collection,
-                            dataset_processor = dp,
-                            output_base_dir = "./results/trainings/cpa_analysis" if not only_sample\
-                                        else "./results/trainings/cpa_analysis_sample" ,
+                            dataset_processor = iara_default.default_iara_audio_processor(),
+                            output_base_dir = output_base_dir,
                             n_folds=10 if not only_sample else 3)
 
             config.save(config_dir)
 
-        trainer_list = []
+        trainers = iara_default.default_trainers(config=config)
 
+        managers.append(iara_exp.Manager(config, *trainers))
 
-        trainer_list.append(iara_trn.RandomForestTrainer(
-                                    training_strategy=iara_trn.ModelTrainingStrategy.MULTICLASS,
-                                    trainer_id = 'RandomForest',
-                                    n_targets = config.dataset.target.get_n_targets(),
-                                    n_estimators=100,
-                                    max_depth=None))
+        managers[-1].run(folds = folds)
 
-        trainer_list.append(iara_trn.OptimizerTrainer(
-                                    training_strategy=iara_trn.ModelTrainingStrategy.MULTICLASS,
-                                    trainer_id = 'MLP',
-                                    n_targets = config.dataset.target.get_n_targets(),
-                                    model_allocator=lambda input_shape, n_targets:
-                                        iara_mlp.MLP(input_shape=input_shape,
-                                            n_neurons=64,
-                                            n_targets=n_targets),
-                                    optimizer_allocator=lambda model:
-                                        torch.optim.Adam(model.parameters(), lr=5e-5),
-                                    batch_size = 128,
-                                    n_epochs = 256,
-                                    patience=8))
-
-        trainer_list.append(iara_trn.RandomForestTrainer(
-                                    training_strategy=iara_trn.ModelTrainingStrategy.CLASS_SPECIALIST,
-                                    trainer_id = 'RandomForest',
-                                    n_targets = config.dataset.target.get_n_targets(),
-                                    n_estimators=100,
-                                    max_depth=None))
-
-        trainer_list.append(iara_trn.OptimizerTrainer(
-                                    training_strategy=iara_trn.ModelTrainingStrategy.CLASS_SPECIALIST,
-                                    trainer_id = 'MLP',
-                                    n_targets = config.dataset.target.get_n_targets(),
-                                    model_allocator=lambda input_shape, _:
-                                        iara_mlp.MLP(input_shape=input_shape,
-                                            n_neurons=64),
-                                    batch_size = 128,
-                                    n_epochs = 256,
-                                    patience=None))
-
-        trainer_list.append(iara_exp.Manager(config, *trainer_list))
-
-        trainer_list[-1].run(folds = folds)
+    output_dir = f"{DEFAULT_DIRECTORIES.comparison_dir}/{cpa_str}"
 
     comparator = iara_exp.Comparator(
-                            output_dir= "./results/comparisons/cpa_analysis",
-                            trainer_list=trainer_list)
+                            output_dir= output_dir,
+                            manager_list=managers)
 
     comparator.cross_compare_in_test(folds = folds)
 

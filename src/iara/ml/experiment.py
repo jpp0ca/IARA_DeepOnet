@@ -338,7 +338,7 @@ class Comparator():
     datasets. It iterates through all combinations of two trainers from the provided list of
     trainers, and evaluates each combination on the test dataset of the second trainer.
     """
-    def __init__(self, output_dir: str, trainer_list: typing.List[Manager]) -> None:
+    def __init__(self, output_dir: str, manager_list: typing.List[Manager]) -> None:
         """
         Args:
             output_dir (str): The directory path where evaluation results will be saved.
@@ -346,7 +346,7 @@ class Comparator():
                 compared.
         """
         self.output_dir = output_dir
-        self.trainer_list = trainer_list
+        self.manager_list = manager_list
 
     def cross_compare_in_test(self, folds: typing.List[int] = None):
         """
@@ -361,7 +361,7 @@ class Comparator():
         """
         grid = iara_metrics.GridCompiler()
 
-        for trainer_1, trainer_2 in itertools.permutations(self.trainer_list, 2):
+        for trainer_1, trainer_2 in itertools.permutations(self.manager_list, 2):
 
             test_df1, _ = trainer_2.config.split_datasets()
 
@@ -386,7 +386,7 @@ class Comparator():
                         model_base_dir = model_base_dir,
                         dataset = dataset)
 
-                    grid.add(params={'': f'{trainer_1.config.name} ({str(trainer)}) \
+                    grid.add(params={'': f'{trainer_1.config.name} ({trainer.trainer_id}) \
                                 -> {trainer_2.config.name}'},
                              i_fold=i_fold,
                              target=evaluation['Target'],

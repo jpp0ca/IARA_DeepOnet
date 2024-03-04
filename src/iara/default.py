@@ -12,11 +12,15 @@ class Directories:
                  data_dir="./data/iara",
                  process_dir="./data/iara_processed",
                  config_dir="./results/configs",
-                 training_dir="./results/trainings"):
+                 training_dir="./results/trainings",
+                 comparison_dir="./results/comparisons",
+                 tables_dir="./results/tables"):
         self.data_dir = data_dir
         self.process_dir = process_dir
         self.config_dir = config_dir
         self.training_dir = training_dir
+        self.comparison_dir = comparison_dir
+        self.tables_dir = tables_dir
 
 
 DEFAULT_DIRECTORIES = Directories()
@@ -33,6 +37,22 @@ def default_iara_audio_processor(directories: Directories = DEFAULT_DIRECTORIES)
         analysis = iara_proc.SpectralAnalysis.LOFAR,
         n_pts = 1024,
         n_overlap = 0,
+        decimation_rate = 3,
+        frequency_limit=5e3,
+        integration_overlap=0,
+        integration_interval=1.024
+    )
+
+def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTORIES):
+    """Method to get default AudioFileProcessor for iara."""
+    return iara_manager.AudioFileProcessor(
+        data_base_dir = directories.data_dir,
+        data_processed_base_dir = directories.process_dir,
+        normalization = iara_proc.Normalization.NORM_L2,
+        analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
+        n_pts = 1024,
+        n_overlap = 0,
+        n_mels=64,
         decimation_rate = 3,
         frequency_limit=5e3,
         integration_overlap=0,

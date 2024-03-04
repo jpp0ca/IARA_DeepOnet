@@ -74,7 +74,7 @@ ID,Dataset,Ship ID,SHIPTYPE,TYPE,DETAILED TYPE,Name,CPA time,Rain,Temperature,Wi
 73,A,50,80,Tanker,Crude Oil Tanker,MARCILIO DIAS,150,0,20.2,4,2,No rain
 74,A,51,59,Special Craft,Offshore Supply Ship,CBO CAROLINA,150,0,22.5,3.5,2,No rain
 75,A,2,50,Special Craft,Pilot Vessel,PILOT 10,150,0,20.2,2.7,2,No rain
-76,A,52,80,Tanker ,Oil Products Tanker,ANITA GARIBALDI,61,0,21.9,0.4,1,No rain
+76,A,52,80,Tanker,Oil Products Tanker,ANITA GARIBALDI,61,0,21.9,0.4,1,No rain
 77,A,53,59,Special Craft,Supply Vessel,NORMAND CARIOCA,150,0,28.5,5.9,3,No rain
 78,A,54,70,Cargo,Bulk Carrier,ZHONG AN YANG,150,0,27.5,6.5,3,No rain
 79,A,51,59,Special Craft,Offshore Supply Ship,CBO CAROLINA,150,0,25.4,13.1,6,No rain
