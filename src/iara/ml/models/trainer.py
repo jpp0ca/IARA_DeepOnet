@@ -358,6 +358,8 @@ class OptimizerTrainer(BaseTrainer):
         Returns:
             None
         """
+        
+        print('Fitting in ', self.device)
         self._check_dataset(trn_dataset)
         self._check_dataset(val_dataset)
         if self.is_trained(model_base_dir=model_base_dir):

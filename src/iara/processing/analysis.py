@@ -71,6 +71,7 @@ class Normalization(enum.Enum):
     MIN_MAX_ZERO_CENTERED = 1
     NORM_L1 = 2
     NORM_L2 = 3
+    NONE = 4
 
     def apply(self, data: np.array) -> np.array:
         """
@@ -98,6 +99,9 @@ class Normalization(enum.Enum):
         if self == Normalization.NORM_L2:
             data = Normalization.MIN_MAX.apply(data)
             return data/np.linalg.norm(data, ord=2, axis=0)
+
+        if self == Normalization.NONE:
+            return data
 
         raise UnboundLocalError(f"normalization {type:d} not implemented")
 

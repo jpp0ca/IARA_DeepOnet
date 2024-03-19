@@ -6,6 +6,7 @@ import tqdm
 
 import pandas as pd
 import numpy as np
+from concurrent.futures import ThreadPoolExecutor
 
 import torch
 import torch.utils.data as torch_data
@@ -65,7 +66,8 @@ class AudioDataset(BaseDataset):
         MEMORY_LIMIT (int): Maximum size in bytes of a dataframe that can be loaded into memory.
             When a dataset exceeds this limit, the data is loaded partially as needed.
     """
-    MEMORY_LIMIT = 2 * 1024 * 1024 * 1024  # gigabytes
+    MEMORY_LIMIT = 7 * 1024 * 1024 * 1024  # gigabytes
+    N_WORKERS = 8
 
     def __init__(self,
                  processor: iara_proc_manager.AudioFileProcessor,
@@ -88,6 +90,11 @@ class AudioDataset(BaseDataset):
         self.last_id = -1
         self.partial_data = []
 
+        with ThreadPoolExecutor(max_workers=AudioDataset.N_WORKERS) as executor:
+            for dataset_id, target in tqdm.tqdm(list(zip(file_ids, targets)),
+                                                desc='Processing dataset', leave=False):
+                executor.submit(self.processor.get_data, dataset_id)
+
         total_memory = 0
         for dataset_id, target in tqdm.tqdm(list(zip(file_ids, targets)),
                                             desc='Loading dataset', leave=False):
@@ -101,16 +108,17 @@ class AudioDataset(BaseDataset):
 
             if total_memory > AudioDataset.MEMORY_LIMIT:
                 self.data = None
+                print('Exceeds memory limit')
             else:
                 self.data = pd.concat([self.data, data_df], ignore_index=True)
 
-        # # Uncomment to print total memory needed by keeping a dataset in memory
-        # unity = ['B', 'KB', 'MB', 'GB', 'TB']
-        # cont = 0
-        # while total_memory > 1024:
-        #     total_memory /= 1024
-        #     cont += 1
-        # print('total_memory: ', total_memory, unity[cont])
+        # Uncomment to print total memory needed by keeping a dataset in memory
+        unity = ['B', 'KB', 'MB', 'GB', 'TB']
+        cont = 0
+        while total_memory > 1024:
+            total_memory /= 1024
+            cont += 1
+        print('total_memory: ', total_memory, unity[cont])
 
         self.targets = torch.tensor(self.targets.values, dtype=torch.int64)
 

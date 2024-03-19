@@ -14,6 +14,7 @@ import itertools
 
 import torch
 
+import iara.utils
 import iara.records
 import iara.ml.models.mlp as iara_mlp
 import iara.ml.experiment as iara_exp
@@ -30,6 +31,8 @@ def main(override: bool,
         include_other: bool,
         training_strategy: iara_trn.ModelTrainingStrategy):
     """Grid search main function"""
+
+    iara.utils.print_available_device()
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
 
@@ -106,7 +109,7 @@ def main(override: bool,
                                 activation_hidden_layer=activation),
                     optimizer_allocator=lambda model:
                         torch.optim.Adam(model.parameters(), lr=5e-5),
-                    batch_size = 128,
+                    batch_size = 1024,
                     n_epochs = 512,
                     patience=32))
 
