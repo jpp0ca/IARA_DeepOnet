@@ -7,6 +7,7 @@ import random
 import os
 import shutil
 import datetime
+import psutil
 
 import numpy as np
 
@@ -60,3 +61,23 @@ def backup_folder(base_dir, time_str_format = "%Y%m%d-%H%M%S"):
             except ValueError:
                 pass
         shutil.move(item_path, backup_dir)
+
+def available_gpu_memory() -> float:
+    """Get the gpu available memory em bytes."""
+
+    if not torch.cuda.is_available():
+        return 0
+
+    device = torch.device("cuda")
+    gpu_props = torch.cuda.get_device_properties(0)
+
+    memory_stats = torch.cuda.memory_stats(device)
+    memory_available = memory_stats["allocated_bytes.all.current"]
+
+    memory_available = gpu_props.total_memory - memory_available
+    return memory_available
+
+def available_cpu_memory() -> float:
+    """Get the cpu available memory em bytes."""
+    memory = psutil.virtual_memory()
+    return memory.available

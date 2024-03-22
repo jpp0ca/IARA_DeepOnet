@@ -358,8 +358,7 @@ class OptimizerTrainer(BaseTrainer):
         Returns:
             None
         """
-        
-        print('Fitting in ', self.device)
+
         self._check_dataset(trn_dataset)
         self._check_dataset(val_dataset)
         if self.is_trained(model_base_dir=model_base_dir):
@@ -384,6 +383,7 @@ class OptimizerTrainer(BaseTrainer):
                 partial_trn = pickle.load(f)
         else:
             partial_trn = None
+
 
         for target_id, (model, optimizer, loss_module) in container if (len(container) == 1) else \
                     tqdm.tqdm(container, leave=False, desc="Classes"):
@@ -420,6 +420,8 @@ class OptimizerTrainer(BaseTrainer):
                     best_val_loss = partial_trn['best_val_loss']
                     epochs_without_improvement = partial_trn['epochs_without_improvement']
                     best_model_state_dict = partial_trn['best_model_state_dict']
+
+            model = model.to(self.device)
 
             for i_epoch in tqdm.tqdm(range(self.n_epochs), leave=False, desc="Epochs"):
                 n_epochs += 1
@@ -550,6 +552,7 @@ class OptimizerTrainer(BaseTrainer):
 
         if os.path.exists(partial_trn_model):
             os.remove(partial_trn_model)
+
 
     def eval(self,
             dataset_id: str,

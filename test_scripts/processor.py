@@ -43,7 +43,7 @@ def main(override: bool = True, only_sample: bool = False):
 
 
     # for plot_type in iara_manager.PlotType:
-    for plot_type in [iara_manager.PlotType.EXPORT_RAW]:
+    for plot_type in [iara_manager.PlotType.EXPORT_RAW, iara_manager.PlotType.EXPORT_PLOT]:
         dp.plot(df['ID'].head(10),
                 plot_type=plot_type,
                 frequency_in_x_axis=True,

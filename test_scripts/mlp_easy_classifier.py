@@ -27,19 +27,17 @@ from iara.default import DEFAULT_DIRECTORIES
 
 def main(override: bool,
         folds: typing.List[int],
-        only_sample: bool,
-        include_other: bool,
         training_strategy: iara_trn.ModelTrainingStrategy):
     """Grid search main function"""
 
     iara.utils.print_available_device()
 
-    grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
+    grid_str = 'grid_search_test'
 
     config_dir = f"{DEFAULT_DIRECTORIES.config_dir}/{grid_str}"
 
     configs = {
-        f'mlp_{str(training_strategy)}': iara.records.Collection.OS_SHIP
+        f'mlp_test_{str(training_strategy)}': iara.records.Collection.A
     }
 
     for config_name, collection in configs.items():
@@ -56,11 +54,11 @@ def main(override: bool,
             custom_collection = iara.records.CustomCollection(
                             collection = collection,
                             target = iara.records.Target(
-                                column = 'TYPE',
-                                values = ['Cargo', 'Tanker', 'Tug'],
-                                include_others = include_other
+                                column = 'DETAILED TYPE',
+                                values = ['Pilot Vessel', 'Motor Hopper'],
+                                include_others = False
                             ),
-                            only_sample=only_sample
+                            only_sample=False
                         )
 
             output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
@@ -70,15 +68,17 @@ def main(override: bool,
                             dataset = custom_collection,
                             dataset_processor = iara_default.default_iara_audio_processor(),
                             output_base_dir = output_base_dir,
-                            n_folds=10 if not only_sample else 3)
+                            n_folds=10,
+                            excludent_ship_id=False)
 
             config.save(config_dir)
 
         mlp_trainers = []
 
         grid_search = {
-            'Neurons': [4, 16, 64, 256],
-            'Activation': ['Tanh', 'ReLU', 'PReLU']
+            'Neurons': [16],
+            'Activation': ['Tanh']
+            # 'Activation': ['Tanh', 'ReLU', 'PReLU']
         }
 
         activation_dict = {
@@ -109,7 +109,7 @@ def main(override: bool,
                                 activation_hidden_layer=activation),
                     optimizer_allocator=lambda model:
                         torch.optim.Adam(model.parameters()),
-                    batch_size = 32*1024,
+                    batch_size = 64*1024,
                     n_epochs = 512,
                     patience=32))
 
@@ -138,10 +138,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='RUN MLP grid search analysis')
     parser.add_argument('--override', action='store_true', default=False,
                         help='Ignore old runs')
-    parser.add_argument('--only_sample', action='store_true', default=False,
-                        help='Execute only in sample_dataset. For quick training and test.')
-    parser.add_argument('--exclude_other', action='store_true', default=False,
-                        help='Include records besides than [Cargo, Tanker, Tug] in training.')
     parser.add_argument('--training_strategy', type=str, choices=strategy_str_list,
                         default=None, help='Strategy for training the model')
     parser.add_argument('--fold', type=str, default='',
@@ -163,14 +159,10 @@ if __name__ == "__main__":
         index = strategy_str_list.index(args.training_strategy)
         main(override = args.override,
             folds = folds_to_execute,
-            only_sample = args.only_sample,
-            include_other = not args.exclude_other,
             training_strategy = iara_trn.ModelTrainingStrategy(index))
 
     else:
         for strategy in iara_trn.ModelTrainingStrategy:
             main(override = args.override,
                 folds = folds_to_execute,
-                only_sample = args.only_sample,
-                include_other = not args.exclude_other,
                 training_strategy = strategy)

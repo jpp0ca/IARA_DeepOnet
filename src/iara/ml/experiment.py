@@ -32,7 +32,8 @@ class Config:
                 dataset_processor: iara_manager.AudioFileProcessor,
                 output_base_dir: str,
                 n_folds: int = 10,
-                test_factor: float = 0.2):
+                test_factor: float = 0.2,
+                excludent_ship_id = True):
         """
         Parameters:
         - name (str): A unique identifier for the training configuration.
@@ -51,6 +52,7 @@ class Config:
         self.output_base_dir = os.path.join(output_base_dir, self.name)
         self.n_folds = n_folds
         self.test_factor = test_factor
+        self.excludent_ship_id = excludent_ship_id
 
     def __str__(self) -> str:
         return  f"----------- {self.name} ----------- \n{str(self.dataset)}"
@@ -90,10 +92,11 @@ class Config:
             trn_val_set, test_set = df.iloc[trn_val_index], df.iloc[test_index]
 
         # Move elements with 'Ship ID' present in test set and trn_val_set set to test set
-        for ship_id in test_set['Ship ID'].unique():
-            ship_data = trn_val_set[trn_val_set['Ship ID'] == ship_id]
-            test_set = pd.concat([test_set, ship_data])
-            trn_val_set = trn_val_set[trn_val_set['Ship ID'] != ship_id]
+        if self.excludent_ship_id:
+            for ship_id in test_set['Ship ID'].unique():
+                ship_data = trn_val_set[trn_val_set['Ship ID'] == ship_id]
+                test_set = pd.concat([test_set, ship_data])
+                trn_val_set = trn_val_set[trn_val_set['Ship ID'] != ship_id]
 
         skf = sk_selection.StratifiedKFold(n_splits=self.n_folds, shuffle=True, random_state=42)
 

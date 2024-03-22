@@ -66,7 +66,7 @@ class AudioDataset(BaseDataset):
         MEMORY_LIMIT (int): Maximum size in bytes of a dataframe that can be loaded into memory.
             When a dataset exceeds this limit, the data is loaded partially as needed.
     """
-    MEMORY_LIMIT = 7 * 1024 * 1024 * 1024  # gigabytes
+    MEMORY_LIMIT = 2 * 1024 * 1024 * 1024  # gigabytes
     N_WORKERS = 8
 
     def __init__(self,
@@ -107,18 +107,19 @@ class AudioDataset(BaseDataset):
             total_memory += data_df.memory_usage(deep=True).sum()
 
             if total_memory > AudioDataset.MEMORY_LIMIT:
+                if self.data is not None:
+                    print('Exceeds memory limit')
                 self.data = None
-                print('Exceeds memory limit')
             else:
                 self.data = pd.concat([self.data, data_df], ignore_index=True)
 
         # Uncomment to print total memory needed by keeping a dataset in memory
-        unity = ['B', 'KB', 'MB', 'GB', 'TB']
-        cont = 0
-        while total_memory > 1024:
-            total_memory /= 1024
-            cont += 1
-        print('total_memory: ', total_memory, unity[cont])
+        # unity = ['B', 'KB', 'MB', 'GB', 'TB']
+        # cont = 0
+        # while total_memory > 1024:
+        #     total_memory /= 1024
+        #     cont += 1
+        # print('total_memory: ', total_memory, unity[cont])
 
         self.targets = torch.tensor(self.targets.values, dtype=torch.int64)
 
