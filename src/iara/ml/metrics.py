@@ -95,7 +95,9 @@ class CrossValidationCompiler():
         self._score_dict = {
             'i_fold':[],
             'n_samples':[],
-            'metrics': []
+            'metrics': [],
+            'abs_cm': {},
+            'rel_cm': {}
         }
 
         for metric in Metric:
@@ -123,6 +125,51 @@ class CrossValidationCompiler():
 
         self._score_dict['metrics'].extend(metric_list)
         self._score_dict['metrics'] = list(set(self._score_dict['metrics']))
+
+        self._score_dict['abs_cm'][i_fold] = sk_metrics.confusion_matrix(target, prediction)
+        self._score_dict['rel_cm'][i_fold] = sk_metrics.confusion_matrix(target, prediction, normalize='true')
+
+    def print_abs_cm(self):
+        result = ""
+        result_matrix = None
+        for i_fold in self._score_dict['i_fold']:
+            if result_matrix is None:
+                result_matrix = self._score_dict['abs_cm'][i_fold].flatten()
+            else:
+                result_matrix = np.column_stack((result_matrix, self._score_dict['abs_cm'][i_fold].flatten()))
+
+        mean = np.mean(result_matrix, axis=1)
+        std = np.std(result_matrix, axis=1)
+        n_elements = self._score_dict['abs_cm'][self._score_dict['i_fold'][0]].shape
+
+        for i in range(n_elements[0]):
+            for j in range(n_elements[1]):
+                result += f'{mean[n_elements[1]*i + j]:.1f} +- {std[n_elements[1]*i + j]:.1f} \t'
+            result += '\n'
+
+        return result
+    
+    def print_rel_cm(self):
+        result = ""
+        result_matrix = None
+        for i_fold in self._score_dict['i_fold']:
+            if result_matrix is None:
+                result_matrix = self._score_dict['rel_cm'][i_fold].flatten()
+            else:
+                result_matrix = np.column_stack((result_matrix, self._score_dict['rel_cm'][i_fold].flatten()))
+
+        mean = np.mean(result_matrix, axis=1)
+        std = np.std(result_matrix, axis=1)
+        n_elements = self._score_dict['rel_cm'][self._score_dict['i_fold'][0]].shape
+
+        for i in range(n_elements[0]):
+            if i != 0:
+                result += '\n'
+
+            for j in range(n_elements[1]):
+                result += f'{mean[n_elements[1]*i + j]*100:.2f} +- {std[n_elements[1]*i + j]*100:.2f} \t'
+
+        return result
 
     @staticmethod
     def str_format(values, n_samples=60, tex_format=False) -> str:
@@ -297,4 +344,17 @@ class GridCompiler():
         )
 
     def __str__(self) -> str:
-        return self.as_str()
+
+        ret = '------- Confusion Matrix -------------\n'
+
+        for hash, dict in self.cv_dict.items():
+            ret += f'-- {dict["params"]} --\n\n'
+            ret += dict['cv'].print_abs_cm()
+            ret += '\n'
+            ret += dict['cv'].print_rel_cm()
+            ret += '\n'
+        
+        ret += '\n------- Metric Table -------------\n'
+        ret += self.as_str()
+
+        return ret

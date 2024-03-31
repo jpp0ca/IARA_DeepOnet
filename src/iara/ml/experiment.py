@@ -33,7 +33,8 @@ class Config:
                 output_base_dir: str,
                 n_folds: int = 10,
                 test_factor: float = 0.2,
-                excludent_ship_id = True):
+                excludent_ship_id = True,
+                outer_splits = 3):
         """
         Parameters:
         - name (str): A unique identifier for the training configuration.
@@ -53,6 +54,7 @@ class Config:
         self.n_folds = n_folds
         self.test_factor = test_factor
         self.excludent_ship_id = excludent_ship_id
+        self.outer_splits = outer_splits
 
     def __str__(self) -> str:
         return  f"----------- {self.name} ----------- \n{str(self.dataset)}"
@@ -74,37 +76,38 @@ class Config:
         return jsonpickle.decode(json_str)
 
     def split_datasets(self) -> \
-        typing.Tuple[pd.DataFrame, typing.List[typing.Tuple[pd.DataFrame, pd.DataFrame]]]:
+        typing.List[typing.Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
         """
         Split the dataset into training, validation, and test sets.
 
         Returns:
-        - test_set (pd.DataFrame): Test set with a stratified split.
-        - trn_val_set_list (list): List of tuples containing training and validation sets
+        - list (list): List of tuples containing training, validation and test sets
             for each fold in StratifiedKFold strategy
         """
         df = self.dataset.to_df()
 
-        sss = sk_selection.StratifiedShuffleSplit(n_splits=1,
+        split_list = []
+
+        sss = sk_selection.StratifiedShuffleSplit(n_splits=self.outer_splits,
                                                   test_size=self.test_factor, random_state=42)
 
         for trn_val_index, test_index in sss.split(df, df['Target']):
             trn_val_set, test_set = df.iloc[trn_val_index], df.iloc[test_index]
 
-        # Move elements with 'Ship ID' present in test set and trn_val_set set to test set
-        if self.excludent_ship_id:
-            for ship_id in test_set['Ship ID'].unique():
-                ship_data = trn_val_set[trn_val_set['Ship ID'] == ship_id]
-                test_set = pd.concat([test_set, ship_data])
-                trn_val_set = trn_val_set[trn_val_set['Ship ID'] != ship_id]
+            # Move elements with 'Ship ID' present in test set and trn_val_set set to test set
+            if self.excludent_ship_id:
+                for ship_id in test_set['Ship ID'].unique():
+                    ship_data = trn_val_set[trn_val_set['Ship ID'] == ship_id]
+                    test_set = pd.concat([test_set, ship_data])
+                    trn_val_set = trn_val_set[trn_val_set['Ship ID'] != ship_id]
 
-        skf = sk_selection.StratifiedKFold(n_splits=self.n_folds, shuffle=True, random_state=42)
+            skf = sk_selection.StratifiedKFold(n_splits=self.n_folds, shuffle=True, random_state=42)
 
-        trn_val_set_list = []
-        for trn_idx, val_idx in skf.split(trn_val_set, trn_val_set['Target']):
-            trn_val_set_list.append((trn_val_set.iloc[trn_idx], trn_val_set.iloc[val_idx]))
+            for trn_idx, val_idx in skf.split(trn_val_set, trn_val_set['Target']):
+                split_list.append((trn_val_set.iloc[trn_idx], trn_val_set.iloc[val_idx], test_set))
 
-        return test_set, trn_val_set_list
+        return split_list
+
 
 class Manager():
     """Class for managing and executing training based on a Config for multiple trainers"""
@@ -192,11 +195,17 @@ class Manager():
                                                     val_dataset_ids,
                                                     val_targets)
 
-        for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
-                            tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers"):
-            trainer.fit(model_base_dir=model_base_dir,
-                    trn_dataset=trn_dataset,
-                    val_dataset=val_dataset)
+        for _ in tqdm.tqdm(range(1), leave=False, bar_format = "{desc}",
+                           desc=f'Trn({str(trn_dataset)}) Val({str(val_dataset)})'):
+
+            for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
+                                tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers"):
+                trainer.fit(model_base_dir=model_base_dir,
+                        trn_dataset=trn_dataset,
+                        val_dataset=val_dataset)
+
+        del trn_dataset
+        del val_dataset
 
     def is_evaluated(self, dataset_id: str, eval_base_dir: str) -> bool:
         """
@@ -254,7 +263,7 @@ class Manager():
 
     def compile_results(self,
                         dataset_id: str,
-                        trainer: iara_trainer.BaseTrainer,
+                        trainer_list: typing.List[iara_trainer.BaseTrainer] = None,
                         folds: typing.List[int] = None) -> typing.List[pd.DataFrame]:
         """Compiles evaluated results for a specified trainer.
 
@@ -268,29 +277,63 @@ class Manager():
         Returns:
             typing.List[pd.DataFrame]: List of DataFrame with two columns, ["Target", "Prediction"].
         """
-        all_results = []
-        for i_fold in range(self.config.n_folds):
 
-            if folds and i_fold not in folds:
-                continue
+        result_dict = {}
 
-            eval_base_dir = os.path.join(self.config.output_base_dir,
-                                            'eval',
-                                            f'{i_fold}_of_{self.config.n_folds}')
+        for trainer in trainer_list if trainer_list is not None else self.trainer_list:
 
-            all_results.append(trainer.eval(dataset_id=dataset_id, eval_base_dir=eval_base_dir))
+            results = []
+            for i_fold in range(self.config.n_folds):
 
+                if folds and i_fold not in folds:
+                    continue
 
-        return all_results
+                eval_base_dir = os.path.join(self.config.output_base_dir,
+                                                'eval',
+                                                f'{i_fold}_of_{self.config.n_folds}')
+
+                results.append(trainer.eval(dataset_id=dataset_id, eval_base_dir=eval_base_dir))
+
+            result_dict[trainer.trainer_id] = results
+
+        return result_dict
+
+    def print_dataset_details(self, test_set, trn_val_set_list) -> None:
+
+        df = self.config.dataset.to_compiled_df()
+        df_test = self.config.dataset.to_compiled_df(test_set)
+
+        df = df.rename(columns={'Qty': 'Total'})
+        df_test = df_test.rename(columns={'Qty': 'Test'})
+
+        df = pd.merge(df, df_test, on=self.config.dataset.target.column)
+
+        for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list):
+
+            df_trn = self.config.dataset.to_compiled_df(trn_set)
+            df_val = self.config.dataset.to_compiled_df(val_set)
+
+            df_trn = df_trn.rename(columns={'Qty': f'Trn_{i_fold}'})
+            df_val = df_val.rename(columns={'Qty': f'Val_{i_fold}'})
+
+            df = pd.merge(df, df_trn, on=self.config.dataset.target.column)
+            df = pd.merge(df, df_val, on=self.config.dataset.target.column)
+
+            break
+
+        print('--- Dataset ---')
+        print(df)
 
     def run(self, folds: typing.List[int] = None) -> typing.Dict:
         """Execute training based on the Config"""
 
         self.__prepare_output_dir()
+        test_set, trn_val_set_list = self.config.split_datasets()
 
-        _, trn_val_set_list = self.config.split_datasets()
+        self.print_dataset_details(test_set, trn_val_set_list)
 
-        for _ in tqdm.tqdm(range(1), leave=False, desc="Fitting models", bar_format = "{desc}"):
+        for _ in tqdm.tqdm(range(1), leave=False,
+                           desc="--- Fitting models ---", bar_format = "{desc}"):
             for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if len(folds) == 1 else \
                                     tqdm.tqdm(trn_val_set_list,
                                               leave=False,
@@ -305,7 +348,8 @@ class Manager():
                         val_dataset_ids=val_set['ID'],
                         val_targets=val_set['Target'])
 
-        for _ in tqdm.tqdm(range(1), leave=False, desc="Evaluating models", bar_format = "{desc}"):
+        for _ in tqdm.tqdm(range(1), leave=False,
+                           desc="--- Evaluating models ---", bar_format = "{desc}"):
             for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if len(folds) == 1 else \
                                     tqdm.tqdm(trn_val_set_list,
                                               leave=False,
@@ -315,22 +359,23 @@ class Manager():
                     continue
 
                 self.eval(i_fold=i_fold,
+                          dataset_id='trn',
+                          dataset_ids=trn_set['ID'],
+                          targets=trn_set['Target'])
+
+                self.eval(i_fold=i_fold,
                           dataset_id='val',
                           dataset_ids=val_set['ID'],
                           targets=val_set['Target'])
 
+                self.eval(i_fold=i_fold,
+                          dataset_id='test',
+                          dataset_ids=test_set['ID'],
+                          targets=test_set['Target'])
 
-        result_dict = {}
-
-        for trainer in self.trainer_list:
-
-            results = self.compile_results(dataset_id='val',
-                                          trainer=trainer,
-                                          folds=folds)
-
-            result_dict[trainer.trainer_id] = results
-
-        return result_dict
+        return self.compile_results(dataset_id='val',
+                                trainer_list=self.trainer_list,
+                                folds=folds)
 
 
 class Comparator():

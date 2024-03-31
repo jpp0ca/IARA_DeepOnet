@@ -513,36 +513,20 @@ class OptimizerTrainer(BaseTrainer):
                                                     target_id=target_id,
                                                     complement='trn_batch',
                                                     extention='png')
-                log_batch_error_filename = self.output_filename(model_base_dir=model_base_dir,
-                                                    target_id=target_id,
-                                                    complement='trn_batch_log',
-                                                    extention='png')
                 epoch_error_filename = self.output_filename(model_base_dir=model_base_dir,
                                                     target_id=target_id,
                                                     complement='trn_epochs',
-                                                    extention='png')
-                log_epoch_error_filename = self.output_filename(model_base_dir=model_base_dir,
-                                                    target_id=target_id,
-                                                    complement='trn_epochs_log',
                                                     extention='png')
 
                 self._export_trn(trn_error=trn_batch_loss_arr,
                                  batch_error=val_batch_loss_arr,
                                  n_epochs=n_epochs,
-                                 filename=batch_error_filename)
-                self._export_trn(trn_error=trn_batch_loss_arr,
-                                 batch_error=val_batch_loss_arr,
-                                 n_epochs=n_epochs,
-                                 filename=log_batch_error_filename,
-                                 log_scale=True)
-                self._export_trn(trn_error=trn_epoch_loss,
-                                 batch_error=val_epoch_loss,
-                                 n_epochs=n_epochs,
-                                 filename=epoch_error_filename)
+                                 filename=batch_error_filename,
+                                 log_scale=False)
                 self._export_trn(trn_epoch_loss, val_epoch_loss,
                                  n_epochs,
-                                 log_epoch_error_filename,
-                                 log_scale=True)
+                                 epoch_error_filename,
+                                 log_scale=False)
 
 
             if best_model_state_dict:

@@ -91,7 +91,7 @@ def main(show_sample_dataset = False):
     os_sea_state.to_latex(
             os.path.join(DEFAULT_DIRECTORIES.tables_dir, 'os_bg_sea_state.tex'), index=False)
 
-    os_rain_state = os_bg.groupby('Rain state').size().reset_index(name='Qtd')
+    os_rain_state = os_bg.groupby('Rain state').size().reset_index(name='Qty')
 
     order_map = {}
     for state in iara.records.Rain:

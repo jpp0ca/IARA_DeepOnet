@@ -57,16 +57,16 @@ def main(override: bool, unbalanced: bool, training_type: Types):
 
     if unbalanced:
 
-        qtds = [15, 20, 50, 100, 800, 800, 800, 800, 800, 800]
+        qtys = [15, 20, 50, 100, 800, 800, 800, 800, 800, 800]
 
         trn_indexes = []
         val_indexes = []
-        for i, qtd in enumerate(qtds):
+        for i, qty in enumerate(qtys):
             class_index = np.where(np.array(trn_dataset.targets) == i)[0]
-            trn_indexes.extend(class_index[:qtd])
+            trn_indexes.extend(class_index[:qty])
 
             class_index = np.where(np.array(val_dataset.targets) == i)[0]
-            val_indexes.extend(class_index[:qtd])
+            val_indexes.extend(class_index[:qty])
 
     else:
         trn_indexes = None

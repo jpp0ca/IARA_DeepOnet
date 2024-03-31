@@ -77,9 +77,11 @@ def main(override: bool,
         mlp_trainers = []
 
         grid_search = {
-            'Neurons': [4, 16, 64, 256],
-            'Activation': ['Tanh', 'ReLU', 'PReLU']
+            'Neurons': [4, 8, 16, 32, 64, 128, 256, 512, 1024],
+            'Activation': ['ReLU', 'PReLU']
         }
+
+
 
         activation_dict = {
                 'Tanh': torch.nn.Tanh(),

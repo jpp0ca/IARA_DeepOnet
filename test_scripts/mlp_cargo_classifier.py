@@ -37,7 +37,7 @@ def main(override: bool,
     config_dir = f"{DEFAULT_DIRECTORIES.config_dir}/{grid_str}"
 
     configs = {
-        f'mlp_test_{str(training_strategy)}': iara.records.Collection.A
+        f'mlp_cargo_{str(training_strategy)}': iara.records.Collection.OS_SHIP
     }
 
     for config_name, collection in configs.items():
@@ -55,10 +55,14 @@ def main(override: bool,
                             collection = collection,
                             target = iara.records.Target(
                                 column = 'DETAILED TYPE',
-                                values = ['Pilot Vessel', 'Motor Hopper'],
-                                include_others = False
+                                values = ['Bulk Carrier', 'Container Ship', 'General Cargo'],
+                                include_others = True
                             ),
-                            only_sample=False
+                            filters = iara.records.LabelFilter(
+                                column='TYPE',
+                                values=['Cargo']
+                            ),
+                            only_sample=False,
                         )
 
             output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"

@@ -260,7 +260,7 @@ class CustomCollection:
     def __init__(self,
                  collection: Collection,
                  target: Target,
-                 *filters: Filter,
+                 filters: typing.Union[typing.List[Filter], Filter] = None,
                  only_sample: bool = False):
         """
         Parameters:
@@ -273,7 +273,8 @@ class CustomCollection:
         """
         self.collection = collection
         self.target = target
-        self.filters = filters if filters else []
+        self.filters = [] if filters is None else \
+                (filters if isinstance(filters, list) else [filters])
         self.only_sample = only_sample
 
     def __str__(self) -> str:
@@ -294,4 +295,21 @@ class CustomCollection:
             df = filt.apply(df)
 
         df = self.target.apply(df)
+        return df
+
+    def to_compiled_df(self, df=None) -> pd.DataFrame:
+
+        df = self.to_df() if df is None else df
+        if self.target.include_others:
+            df_label = df[df['Target']!=len(self.target.values)]
+            df_others = df[df['Target']==len(self.target.values)]
+
+            df_label = df_label.groupby(self.target.column).size().reset_index(name='Qty')
+            new_row = pd.DataFrame({self.target.column: ['Others'], 'Qty': [df_others.shape[0]]})
+
+            df = pd.concat([df_label, new_row])
+
+        else:
+            df = df.groupby(self.target.column).size().reset_index(name='Qty')
+
         return df
