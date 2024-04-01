@@ -138,8 +138,12 @@ class CrossValidationCompiler():
             else:
                 result_matrix = np.column_stack((result_matrix, self._score_dict['abs_cm'][i_fold].flatten()))
 
-        mean = np.mean(result_matrix, axis=1)
-        std = np.std(result_matrix, axis=1)
+        if len(self._score_dict['i_fold']) != 1:
+            mean = np.mean(result_matrix, axis=1)
+            std = np.std(result_matrix, axis=1)
+        else:
+            mean = result_matrix
+            std = np.zeros(mean.shape)
         n_elements = self._score_dict['abs_cm'][self._score_dict['i_fold'][0]].shape
 
         for i in range(n_elements[0]):
@@ -158,8 +162,12 @@ class CrossValidationCompiler():
             else:
                 result_matrix = np.column_stack((result_matrix, self._score_dict['rel_cm'][i_fold].flatten()))
 
-        mean = np.mean(result_matrix, axis=1)
-        std = np.std(result_matrix, axis=1)
+        if len(self._score_dict['i_fold']) != 1:
+            mean = np.mean(result_matrix, axis=1)
+            std = np.std(result_matrix, axis=1)
+        else:
+            mean = result_matrix
+            std = np.zeros(mean.shape)
         n_elements = self._score_dict['rel_cm'][self._score_dict['i_fold'][0]].shape
 
         for i in range(n_elements[0]):

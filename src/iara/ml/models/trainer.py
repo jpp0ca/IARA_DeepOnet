@@ -103,7 +103,7 @@ class BaseTrainer():
 
     @staticmethod
     def _class_weight(dataset: iara_dataset.BaseDataset, target_id: int = None) -> torch.Tensor:
-        targets = dataset.targets
+        targets = dataset.get_targets()
         if target_id is not None:
             targets = torch.where(targets == target_id, torch.tensor(1.0), torch.tensor(0.0))
 
@@ -318,7 +318,7 @@ class OptimizerTrainer(BaseTrainer):
         raise NotImplementedError('TrainingStrategy has not _loss implemented')
 
     def _check_dataset(self, dataset: iara_dataset.BaseDataset):
-        unique_targets = torch.unique(dataset.targets)
+        unique_targets = torch.unique(dataset.get_targets())
         expected_targets = torch.arange(self.n_targets)
 
         if not torch.equal(unique_targets.sort()[0], expected_targets):
@@ -506,23 +506,14 @@ class OptimizerTrainer(BaseTrainer):
                 with open(partial_trn_model, 'wb') as f:
                     pickle.dump(state, f)
 
-                trn_batch_loss_arr = np.array(trn_batch_loss)
-                val_batch_loss_arr = np.array(val_batch_loss)
+                # trn_batch_loss_arr = np.array(trn_batch_loss)
+                # val_batch_loss_arr = np.array(val_batch_loss)
 
-                batch_error_filename = self.output_filename(model_base_dir=model_base_dir,
-                                                    target_id=target_id,
-                                                    complement='trn_batch',
-                                                    extention='png')
                 epoch_error_filename = self.output_filename(model_base_dir=model_base_dir,
                                                     target_id=target_id,
                                                     complement='trn_epochs',
                                                     extention='png')
 
-                self._export_trn(trn_error=trn_batch_loss_arr,
-                                 batch_error=val_batch_loss_arr,
-                                 n_epochs=n_epochs,
-                                 filename=batch_error_filename,
-                                 log_scale=False)
                 self._export_trn(trn_epoch_loss, val_epoch_loss,
                                  n_epochs,
                                  epoch_error_filename,
@@ -536,7 +527,6 @@ class OptimizerTrainer(BaseTrainer):
 
         if os.path.exists(partial_trn_model):
             os.remove(partial_trn_model)
-
 
     def eval(self,
             dataset_id: str,
@@ -680,7 +670,7 @@ class RandomForestTrainer(BaseTrainer):
             target_ids = [None]
 
         elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
-            target_ids = trn_dataset.classes
+            target_ids = trn_dataset.get_targets()
 
         samples = trn_dataset.data
 
@@ -697,7 +687,7 @@ class RandomForestTrainer(BaseTrainer):
             model = iara_forest.RandomForestModel(n_estimators=self.n_estimators,
                                                   max_depth=self.max_depth)
 
-            targets = trn_dataset.targets
+            targets = trn_dataset.get_targets()
 
             if target_id is not None:
                 targets = torch.where(targets == target_id,
@@ -740,7 +730,7 @@ class RandomForestTrainer(BaseTrainer):
             os.makedirs(eval_base_dir, exist_ok=True)
 
             samples = dataset.data
-            targets = dataset.targets
+            targets = dataset.get_targets()
             predictions = []
 
             if self.training_strategy == ModelTrainingStrategy.MULTICLASS:

@@ -108,6 +108,11 @@ class Config:
 
         return split_list
 
+    def get_data_loader(self) -> iara_dataset.ExperimentDataLoader:
+        df = self.dataset.to_df()
+        return iara_dataset.ExperimentDataLoader(self.dataset_processor,
+                                        df['ID'].to_list(),
+                                        df['Target'].to_list())
 
 class Manager():
     """Class for managing and executing training based on a Config for multiple trainers"""
@@ -123,6 +128,12 @@ class Manager():
         """
         self.config = config
         self.trainer_list = trainers
+        self.experiment_loader = None
+
+    def get_experiment_loader(self) -> iara_dataset.ExperimentDataLoader:
+        if self.experiment_loader is None:
+            self.experiment_loader = self.config.get_data_loader()
+        return self.experiment_loader
 
     def __str__(self) -> str:
         return f'{self.config.name} with {len(self.trainer_list)} models'
@@ -144,25 +155,21 @@ class Manager():
         os.makedirs(self.config.output_base_dir, exist_ok=True)
         self.config.save(self.config.output_base_dir)
 
-    def is_trained(self, model_base_dir: str) -> bool:
-        """
-        Check if all trained models are saved in the specified directory.
+    def get_model_base_dir(self, i_fold: int) -> str:
+        return os.path.join(self.config.output_base_dir,
+                                'model',
+                                f'{i_fold}_of_{self.config.n_folds}')
 
-        Args:
-            model_base_dir (str): The directory where the trained models are expected to be saved.
-
-        Returns:
-            bool: True if all training is completed and models are saved in the directory,
-                False otherwise.
-        """
+    def is_trained(self, i_fold: int) -> bool:
+        model_base_dir = self.get_model_base_dir(i_fold)
         for trainer in self.trainer_list:
             if not trainer.is_trained(model_base_dir):
                 return False
         return True
 
     def fit(self, i_fold: int,
-            trn_dataset_ids: typing.Iterable[int], trn_targets: typing.Iterable,
-            val_dataset_ids: typing.Iterable[int], val_targets: typing.Iterable) -> None:
+            trn_dataset_ids: typing.Iterable[int],
+            val_dataset_ids: typing.Iterable[int]) -> None:
         """
         Fit the model for a specified fold using the provided training and validation dataset IDs
             and targets.
@@ -170,42 +177,28 @@ class Manager():
         Args:
             i_fold (int): The index of the fold.
             trn_dataset_ids (typing.Iterable[int]): Iterable of training dataset IDs.
-            trn_targets (typing.Iterable): Iterable of training targets.
             val_dataset_ids (typing.Iterable[int]): Iterable of validation dataset IDs.
-            val_targets (typing.Iterable): Iterable of validation targets.
         """
-        iara.utils.set_seed()
-
-        model_base_dir = os.path.join(self.config.output_base_dir,
-                                        'model',
-                                        f'{i_fold}_of_{self.config.n_folds}')
-
-        if self.is_trained(model_base_dir):
+        if self.is_trained(i_fold):
             return
 
-        # os.makedirs(model_base_dir, exist_ok=True)
-        # merged_df = pd.concat([trn_dataset_ids, trn_targets], axis=1)
-        # merged_df.to_csv(os.path.join(model_base_dir, 'merged_df.csv'), index=False)
+        trn_dataset = iara_dataset.AudioDataset(self.get_experiment_loader(), trn_dataset_ids)
 
-        trn_dataset = iara_dataset.AudioDataset(self.config.dataset_processor,
-                                                    trn_dataset_ids,
-                                                    trn_targets)
+        val_dataset = iara_dataset.AudioDataset(self.get_experiment_loader(), val_dataset_ids)
 
-        val_dataset = iara_dataset.AudioDataset(self.config.dataset_processor,
-                                                    val_dataset_ids,
-                                                    val_targets)
+        model_base_dir = self.get_model_base_dir(i_fold)
 
         for _ in tqdm.tqdm(range(1), leave=False, bar_format = "{desc}",
-                           desc=f'Trn({str(trn_dataset)}) Val({str(val_dataset)})'):
+                        desc=f'Trn({str(trn_dataset)}) Val({str(val_dataset)})'):
 
             for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
                                 tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers"):
+
+                iara.utils.set_seed()
+
                 trainer.fit(model_base_dir=model_base_dir,
                         trn_dataset=trn_dataset,
                         val_dataset=val_dataset)
-
-        del trn_dataset
-        del val_dataset
 
     def is_evaluated(self, dataset_id: str, eval_base_dir: str) -> bool:
         """
@@ -224,8 +217,7 @@ class Manager():
                 return False
         return True
 
-    def eval(self, i_fold: int, dataset_id: str,
-            dataset_ids: typing.Iterable[int], targets: typing.Iterable) -> None:
+    def eval(self, i_fold: int, dataset_id: str, dataset_ids: typing.Iterable[int]) -> None:
         """
         Eval the model for a specified fold using the provided training and validation dataset IDs
             and targets.
@@ -234,24 +226,20 @@ class Manager():
             i_fold (int): The index of the fold.
             dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
             dataset_ids (typing.Iterable[int]): Iterable of evaluated dataset IDs.
-            targets (typing.Iterable): Iterable of evaluated targets.
         """
-        model_base_dir = os.path.join(self.config.output_base_dir,
-                                        'model',
-                                        f'{i_fold}_of_{self.config.n_folds}')
+        model_base_dir = self.get_model_base_dir(i_fold)
         eval_base_dir = os.path.join(self.config.output_base_dir,
                                         'eval',
                                         f'{i_fold}_of_{self.config.n_folds}')
 
-        if not self.is_trained(model_base_dir):
+        if not self.is_trained(i_fold):
             raise FileNotFoundError(f'Models not trained in {model_base_dir}')
 
         if self.is_evaluated(dataset_id=dataset_id, eval_base_dir=eval_base_dir):
             return
 
-        dataset = iara_dataset.AudioDataset(self.config.dataset_processor,
-                                              dataset_ids,
-                                              targets)
+        dataset = iara_dataset.AudioDataset(self.get_experiment_loader(),
+                                              dataset_ids)
 
         for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
                             tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers"):
@@ -298,26 +286,24 @@ class Manager():
 
         return result_dict
 
-    def print_dataset_details(self, test_set, trn_val_set_list) -> None:
+    def print_dataset_details(self, id_list) -> None:
 
         df = self.config.dataset.to_compiled_df()
-        df_test = self.config.dataset.to_compiled_df(test_set)
-
         df = df.rename(columns={'Qty': 'Total'})
-        df_test = df_test.rename(columns={'Qty': 'Test'})
 
-        df = pd.merge(df, df_test, on=self.config.dataset.target.column)
-
-        for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list):
+        for i_fold, (trn_set, val_set, test_set) in enumerate(id_list):
 
             df_trn = self.config.dataset.to_compiled_df(trn_set)
             df_val = self.config.dataset.to_compiled_df(val_set)
+            df_test = self.config.dataset.to_compiled_df(test_set)
 
             df_trn = df_trn.rename(columns={'Qty': f'Trn_{i_fold}'})
             df_val = df_val.rename(columns={'Qty': f'Val_{i_fold}'})
+            df_test = df_test.rename(columns={'Qty': f'Test_{i_fold}'})
 
             df = pd.merge(df, df_trn, on=self.config.dataset.target.column)
             df = pd.merge(df, df_val, on=self.config.dataset.target.column)
+            df = pd.merge(df, df_test, on=self.config.dataset.target.column)
 
             break
 
@@ -326,52 +312,36 @@ class Manager():
 
     def run(self, folds: typing.List[int] = None) -> typing.Dict:
         """Execute training based on the Config"""
+        folds = folds if folds is not None else range(self.config.n_folds)
 
         self.__prepare_output_dir()
-        test_set, trn_val_set_list = self.config.split_datasets()
+        id_list = self.config.split_datasets()
 
-        self.print_dataset_details(test_set, trn_val_set_list)
+        self.print_dataset_details(id_list)
 
         for _ in tqdm.tqdm(range(1), leave=False,
                            desc="--- Fitting models ---", bar_format = "{desc}"):
-            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if len(folds) == 1 else \
-                                    tqdm.tqdm(trn_val_set_list,
+            for i_fold in folds if len(folds) == 1 else \
+                                    tqdm.tqdm(folds,
                                               leave=False,
-                                              desc="Fold")):
-
-                if folds and i_fold not in folds:
-                    continue
+                                              desc="Fold"):
+                (trn_set, val_set, test_set) = id_list[i_fold]
 
                 self.fit(i_fold=i_fold,
-                        trn_dataset_ids=trn_set['ID'],
-                        trn_targets=trn_set['Target'],
-                        val_dataset_ids=val_set['ID'],
-                        val_targets=val_set['Target'])
-
-        for _ in tqdm.tqdm(range(1), leave=False,
-                           desc="--- Evaluating models ---", bar_format = "{desc}"):
-            for i_fold, (trn_set, val_set) in enumerate(trn_val_set_list if len(folds) == 1 else \
-                                    tqdm.tqdm(trn_val_set_list,
-                                              leave=False,
-                                              desc="Fold")):
-
-                if folds and i_fold not in folds:
-                    continue
+                        trn_dataset_ids=trn_set['ID'].to_list(),
+                        val_dataset_ids=val_set['ID'].to_list())
 
                 self.eval(i_fold=i_fold,
                           dataset_id='trn',
-                          dataset_ids=trn_set['ID'],
-                          targets=trn_set['Target'])
+                          dataset_ids=trn_set['ID'].to_list())
 
                 self.eval(i_fold=i_fold,
                           dataset_id='val',
-                          dataset_ids=val_set['ID'],
-                          targets=val_set['Target'])
+                          dataset_ids=val_set['ID'].to_list())
 
                 self.eval(i_fold=i_fold,
                           dataset_id='test',
-                          dataset_ids=test_set['ID'],
-                          targets=test_set['Target'])
+                          dataset_ids=test_set['ID'].to_list())
 
         return self.compile_results(dataset_id='val',
                                 trainer_list=self.trainer_list,

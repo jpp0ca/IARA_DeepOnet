@@ -1,6 +1,8 @@
 """
 Module providing standardized interfaces for training models in this library.
 """
+import abc
+import overrides
 import typing
 import tqdm
 import math
@@ -14,12 +16,6 @@ import torch.utils.data as torch_data
 
 import iara.utils
 import iara.processing.manager as iara_proc_manager
-
-
-class BaseDataset(torch_data.Dataset):
-    # broken in refactoring - need update
-    def __init__(self):
-        pass
 
 
 class ExperimentDataLoader():
@@ -63,7 +59,7 @@ class ExperimentDataLoader():
                        for file_id, target in zip(file_ids, targets)]
 
             for future in tqdm.tqdm(as_completed(futures), total=len(futures),
-                                    desc='Processing dataset', leave=False):
+                                    desc='Processing/Loading dataset', leave=False):
                 future.result()
 
 
@@ -120,6 +116,24 @@ class ExperimentDataLoader():
         total_memory /= (1024 ** cont)
         return f'{self.total_samples} windows in {total_memory} {unity[cont]}'
 
+class BaseDataset(torch_data.Dataset):
+
+    @abc.abstractmethod
+    def get_dataset_target_distribution(self) -> typing.Dict[int, int]:
+        pass
+
+    def get_targets(self) -> torch.tensor:
+        target_map = self.get_dataset_target_distribution()
+
+        tensor_size = sum(target_map.values())
+        target_tensor = torch.zeros(tensor_size, dtype=torch.int32)
+
+        index = 0
+        for key, value in target_map.items():
+            target_tensor[index:index+value] = key
+            index += value
+
+        return target_tensor
 
 class AudioDataset(BaseDataset):
 
@@ -148,3 +162,17 @@ class AudioDataset(BaseDataset):
         for file_id in self.file_ids:
             total_memory += self.loader.memory_map[file_id]
         return f'{self.limit_ids[-1]} windows in {iara.utils.str_format_bytes(total_memory)}'
+
+    @overrides.override
+    def get_dataset_target_distribution(self) -> typing.Dict[int, int]:
+        target_map = {}
+
+        for file_id in self.file_ids:
+            target = self.loader.target_map[file_id]
+            size = self.loader.size_map[file_id]
+
+            if target not in target_map:
+                target_map[target] = 0
+            target_map[target] += size
+
+        return dict(sorted(target_map.items()))

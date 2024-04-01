@@ -68,7 +68,7 @@ def main(override: bool,
                             dataset = custom_collection,
                             dataset_processor = iara_default.default_iara_audio_processor(),
                             output_base_dir = output_base_dir,
-                            n_folds=10,
+                            n_folds=4,
                             excludent_ship_id=False)
 
             config.save(config_dir)
@@ -107,8 +107,6 @@ def main(override: bool,
                                 n_neurons=n_neurons,
                                 n_targets=n_targets,
                                 activation_hidden_layer=activation),
-                    optimizer_allocator=lambda model:
-                        torch.optim.Adam(model.parameters()),
                     batch_size = 64*1024,
                     n_epochs = 512,
                     patience=32))
@@ -117,12 +115,14 @@ def main(override: bool,
 
         manager.run(folds = folds)
 
+
         for dataset_id in ['trn', 'val', 'test']:
 
             result_dict = manager.compile_results(dataset_id = dataset_id,
                                                   folds = folds)
 
             grid = iara_metrics.GridCompiler()
+
             for trainer_id, results in result_dict.items():
 
                 for i_fold, result in enumerate(results):
