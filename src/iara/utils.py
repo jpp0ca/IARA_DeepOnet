@@ -3,10 +3,12 @@ Utils Module
 
 This module provides utility functions
 """
+import math
 import random
 import os
-import shutil
 import datetime
+
+import shutil
 import psutil
 
 import numpy as np
@@ -81,3 +83,9 @@ def available_cpu_memory() -> float:
     """Get the cpu available memory em bytes."""
     memory = psutil.virtual_memory()
     return memory.available
+
+def str_format_bytes(n_bytes: int) -> str:
+    """ Returns string formatted for human reading """
+    unity = ['B', 'KB', 'MB', 'GB', 'TB']
+    cont = int(math.log(n_bytes, 1024))
+    return f'{n_bytes / (1024 ** cont)} {unity[cont]}'

@@ -50,32 +50,36 @@ config = iara_exp.Config(
                 n_folds=4,
                 excludent_ship_id=False)
 
-list = config.split_datasets2()
-batch_size = 32
+list = config.split_datasets()
+batch_size = 512
 n_epochs = 5
 device = iara.utils.get_available_device()
 
 
 start_time = time.time()
 
+df = custom_collection.to_df()
+
+experiment_loader = iara_dataset.ExperimentDataLoader(config.dataset_processor,
+                                df['ID'].to_list(),
+                                df['Target'].to_list())
+
+
 for n_neurons in tqdm.tqdm([4, 16, 64, 256], desc='Trainers', leave=False):
 
-    for i_fold, (trn_set, val_set, test_set) in enumerate(tqdm.tqdm(list, desc='Fold', leave=False)):
+    for i_fold, (trn_set, val_set, test_set) in \
+            enumerate(tqdm.tqdm(list, desc='Fold', leave=False)):
 
-        trn_dataset = iara_dataset.AudioDataset(config.dataset_processor,
-                                                trn_set['ID'],
-                                                trn_set['Target'])
+        trn_dataset = iara_dataset.AudioDataset(experiment_loader, trn_set['ID'].to_list())
 
-        val_dataset = iara_dataset.AudioDataset(config.dataset_processor,
-                                                val_set['ID'],
-                                                val_set['Target'])
+        val_dataset = iara_dataset.AudioDataset(experiment_loader, val_set['ID'].to_list())
 
         trn_loader = torch_data.DataLoader(trn_dataset,
-                                                batch_size=batch_size,
-                                                shuffle=True)
+                                           batch_size=batch_size,
+                                           shuffle=True)
         val_loader = torch_data.DataLoader(val_dataset,
-                                                batch_size=batch_size,
-                                                shuffle=True)
+                                           batch_size=batch_size,
+                                           shuffle=True)
 
         sample, target = trn_dataset[0]
         input_dim = functools.reduce(lambda x, y: x * y, sample.shape)
