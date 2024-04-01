@@ -10,6 +10,7 @@ import enum
 import typing
 import tqdm
 import json
+import hashlib
 
 import PIL
 import pandas as pd
@@ -103,9 +104,16 @@ class AudioFileProcessor():
         self.integration_overlap = integration_overlap
         self.integration_interval = integration_interval
 
-        self.data_processed_dir = os.path.join(self.data_processed_base_dir,
-                                  str(self.analysis) + "_" + str(self.input_type))
-        self._check_config()
+        self._check_dir()
+
+    def _get_output_dir(self) -> str:
+        return os.path.join(self.data_processed_base_dir,
+                                  str(self.analysis) + "_" + self._get_hash())
+
+    def _get_hash(self) -> str:
+        converted = json.dumps(self._to_dict(), sort_keys=True)
+        hash_obj = hashlib.md5(converted.encode())
+        return hash_obj.hexdigest()
 
     def _to_dict(self) -> typing.Dict:
         return {
@@ -123,28 +131,15 @@ class AudioFileProcessor():
             'integration_interval': self.integration_interval,
         }
 
-    def _save(self):
-        config_file = os.path.join(self.data_processed_base_dir, "config.json")
+    def _save(self, path: str = None):
+        config_file = os.path.join(self._get_output_dir() if path is None else path, "config.json")
         with open(config_file, "w", encoding="utf-8") as f:
             json.dump(self._to_dict(), f, indent=4)
 
-    def _load_config(self) -> typing.Dict:
-        config_file = os.path.join(self.data_processed_base_dir, "config.json")
-        if not os.path.exists(config_file):
-            return None
-
-        with open(config_file, "r", encoding="utf-8") as f:
-            return json.load(f)
-
-    def _check_config(self) -> None:
-        config = self._to_dict()
-        old_config = self._load_config()
-
-        if old_config is None or config == old_config:
-            return
-
-        iara_utils.backup_folder(self.data_processed_base_dir)
-        self._save()
+    def _check_dir(self) -> None:
+        if not os.path.exists(self._get_output_dir()):
+            os.makedirs(self._get_output_dir(), exist_ok=True)
+            self._save()
 
     def _find_raw_file(self, file_id: int) -> str:
         """
@@ -206,8 +201,8 @@ class AudioFileProcessor():
         """
         if self.input_type == InputType.WINDOW:
 
-            os.makedirs(self.data_processed_dir, exist_ok=True)
-            filename = os.path.join(self.data_processed_dir, f'{file_id}.pkl')
+            os.makedirs(self._get_output_dir(), exist_ok=True)
+            filename = os.path.join(self._get_output_dir(), f'{file_id}.pkl')
 
             if os.path.exists(filename):
                 return pd.read_pickle(filename)
@@ -275,9 +270,9 @@ class AudioFileProcessor():
             None
         """
         if plot_type != PlotType.SHOW_FIGURE:
-            output_dir = os.path.join(self.data_processed_base_dir,
-                                      str(self.analysis) + "_" + str(plot_type))
+            output_dir = os.path.join(self._get_output_dir(), str(plot_type))
             os.makedirs(output_dir, exist_ok=True)
+            self._save()
 
         if not isinstance(file_id, int):
             for local_id in tqdm.tqdm(file_id, desc='Plot', leave=False):

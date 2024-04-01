@@ -39,7 +39,7 @@ class ExperimentDataLoader():
                  processor: iara_proc_manager.AudioFileProcessor,
                  file_ids: typing.Iterable[int],
                  targets: typing.Iterable) -> None:
-         """
+        """
         Args:
             processor (iara.processing.manager.AudioFileProcessor): An instance of the
                 AudioFileProcessor class responsible for processing audio data.
@@ -58,7 +58,7 @@ class ExperimentDataLoader():
         self.total_memory = 0
         self.total_samples = 0
 
-        with ThreadPoolExecutor(max_workers=AudioDataset.N_WORKERS) as executor:
+        with ThreadPoolExecutor(max_workers=ExperimentDataLoader.N_WORKERS) as executor:
             futures = [executor.submit(self.__load, file_id, target) 
                        for file_id, target in zip(file_ids, targets)]
 
@@ -67,7 +67,7 @@ class ExperimentDataLoader():
                 future.result()
 
 
-    def load(self, file_id: int, target) -> None:
+    def __load(self, file_id: int, target) -> None:
         """ Process or/and load a single file to data map
 
         Args:

@@ -54,9 +54,6 @@ def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTOR
         n_overlap = 0,
         n_mels=64,
         decimation_rate = 3,
-        frequency_limit=5e3,
-        integration_overlap=0,
-        integration_interval=1.024
     )
 
 def default_deepship_audio_processor(directories: Directories = DEFAULT_DEEPSHIP_DIRECTORIES):
