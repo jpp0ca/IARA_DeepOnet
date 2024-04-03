@@ -37,10 +37,7 @@ def default_iara_audio_processor(directories: Directories = DEFAULT_DIRECTORIES)
         analysis = iara_proc.SpectralAnalysis.LOFAR,
         n_pts = 1024,
         n_overlap = 0,
-        decimation_rate = 3,
-        # frequency_limit=5e3,
-        # integration_overlap=0,
-        # integration_interval=1.024
+        decimation_rate = 3
     )
 
 def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTORIES):
@@ -52,8 +49,8 @@ def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTOR
         analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
         n_pts = 1024,
         n_overlap = 0,
-        n_mels=64,
         decimation_rate = 3,
+        n_mels=64,
     )
 
 def default_deepship_audio_processor(directories: Directories = DEFAULT_DEEPSHIP_DIRECTORIES):
@@ -66,9 +63,6 @@ def default_deepship_audio_processor(directories: Directories = DEFAULT_DEEPSHIP
         n_pts = 1024,
         n_overlap = 0,
         decimation_rate = 2,
-        frequency_limit=5e3,
-        integration_overlap=0,
-        integration_interval=1.024
     )
 
 def default_trainers(config: iara_exp.Config):

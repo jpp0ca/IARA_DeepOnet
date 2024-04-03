@@ -13,9 +13,10 @@ import argparse
 import tqdm
 import numpy as np
 
+import torch
+import torch.utils.data as torch_data
 import torchvision
 
-import torch.utils.data as torch_data
 import iara.ml.dataset as iara_dataset
 import iara.ml.models.trainer as iara_trn
 import iara.ml.models.mlp as iara_mlp
@@ -25,13 +26,31 @@ class Dataset(iara_dataset.BaseDataset):
     """Simple adapter for MNIST dataset keeping interface for training."""
 
     def __init__(self, dataset: torch_data.Dataset, indexes: typing.List[int] = None) -> None:
-        super().__init__(dataset.data, dataset.targets, range(len(dataset.targets)))
+
+        self.samples = dataset.data
+        self.targets = dataset.targets
+
         if indexes is not None:
-            self.data = self.data[indexes]
+            self.samples = self.samples[indexes]
             self.targets = self.targets[indexes]
+
         transform = torchvision.transforms.Normalize((0.5,), (0.5,))
-        self.data = self.data.float()/255
-        self.data = transform(self.data.unsqueeze(1))
+
+        self.samples = self.samples.float()/255
+        self.samples = transform(self.samples.unsqueeze(1))
+
+    def get_targets(self) -> torch.tensor:
+        return self.targets
+
+    def get_samples(self) -> torch.tensor:
+        return self.samples
+
+    def __len__(self):
+        return len(self.targets)
+
+    def __getitem__(self, index) -> typing.Tuple[torch.Tensor, torch.Tensor]:
+        return self.samples[index], self.targets[index]
+
 
 class Types(enum.Enum):
     """Model types for training in this test script."""
@@ -135,7 +154,7 @@ def main(override: bool, unbalanced: bool, training_type: Types):
                             eval_base_dir=eval_dir,
                             dataset=val_dataset)
 
-        grid.add(grid_id=str(trainer),
+        grid.add(params={'trainer': str(trainer)},
             i_fold=0,
             prediction=result["Prediction"],
             target=result["Target"])

@@ -31,7 +31,7 @@ class Config:
                 dataset: iara.records.CustomCollection,
                 dataset_processor: iara_manager.AudioFileProcessor,
                 output_base_dir: str,
-                n_folds: int = 10,
+                n_folds: int = 4,
                 test_factor: float = 0.2,
                 excludent_ship_id = True,
                 outer_splits = 3):
@@ -307,15 +307,16 @@ class Manager():
 
             break
 
-        print('--- Dataset ---')
+        print(f'--- Dataset with {len(id_list)} n_folds ---')
         print(df)
 
     def run(self, folds: typing.List[int] = None) -> typing.Dict:
         """Execute training based on the Config"""
-        folds = folds if folds is not None else range(self.config.n_folds)
-
         self.__prepare_output_dir()
         id_list = self.config.split_datasets()
+
+        if folds is None or len(folds) == 0:
+            folds = range(len(id_list))
 
         self.print_dataset_details(id_list)
 

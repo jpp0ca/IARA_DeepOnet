@@ -16,8 +16,6 @@ import iara.records
 import iara.ml.experiment as iara_exp
 import iara.ml.models.trainer as iara_trn
 import iara.ml.metrics as iara_metrics
-import iara.processing.analysis as iara_proc
-import iara.processing.manager as iara_manager
 
 import iara.default as iara_default
 from iara.default import DEFAULT_DIRECTORIES
@@ -34,81 +32,75 @@ def main(override: bool,
     config_dir = f"{DEFAULT_DIRECTORIES.config_dir}/{grid_str}"
 
     configs = {
-        f'forest_n_mel_{str(training_strategy)}': iara.records.Collection.OS_SHIP
+        f'forest_lofar_{str(training_strategy)}': iara.records.Collection.OS_SHIP
     }
 
-    grid = iara_metrics.GridCompiler()
+    for config_name, collection in configs.items():
 
-    for n_mels in [10, 16, 20, 32, 40, 64]:
+        config = False
+        if not override:
+            try:
+                config = iara_exp.Config.load(config_dir, config_name)
 
-        for config_name, collection in configs.items():
+            except FileNotFoundError:
+                pass
 
-            config = False
-            if not override:
-                try:
-                    config = iara_exp.Config.load(config_dir, config_name)
+        if not config:
+            custom_collection = iara.records.CustomCollection(
+                            collection = collection,
+                            target = iara.records.Target(
+                                column = 'TYPE',
+                                values = ['Cargo', 'Tanker', 'Tug'],
+                                include_others = include_other
+                            ),
+                            only_sample=only_sample
+                        )
 
-                except FileNotFoundError:
-                    pass
+            output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
 
-            if not config:
-                custom_collection = iara.records.CustomCollection(
-                                collection = collection,
-                                target = iara.records.Target(
-                                    column = 'TYPE',
-                                    values = ['Cargo', 'Tanker', 'Tug'],
-                                    include_others = include_other
-                                ),
-                                only_sample=only_sample
-                            )
+            config = iara_exp.Config(
+                            name = config_name,
+                            dataset = custom_collection,
+                            dataset_processor = iara_default.default_iara_audio_processor(),
+                            output_base_dir = output_base_dir)
 
-                output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
+            config.save(config_dir)
 
-                dp = iara_manager.AudioFileProcessor(
-                    data_base_dir = DEFAULT_DIRECTORIES.data_dir,
-                    data_processed_base_dir = f'{DEFAULT_DIRECTORIES.process_dir}/{n_mels}',
-                    normalization = iara_proc.Normalization.MIN_MAX,
-                    analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
-                    n_pts = 1024,
-                    n_overlap = 0,
-                    n_mels=n_mels,
-                    decimation_rate = 3,
-                    frequency_limit=5e3,
-                    integration_overlap=0,
-                    integration_interval=1.024
-                )
+        grid_search = {
+            'Estimators': [25, 100, 250, 500]
+        }
 
-                config = iara_exp.Config(
-                                name = config_name,
-                                dataset = custom_collection,
-                                dataset_processor = dp,
-                                output_base_dir = output_base_dir,
-                                n_folds=10 if not only_sample else 3)
+        mlp_trainers = []
+        param_dict = {}
 
-                config.save(config_dir)
+        combinations = list(itertools.product(*grid_search.values()))
+        for combination in combinations:
+            param_pack = dict(zip(grid_search.keys(), combination))
+            trainer_id = f"forest_{param_pack['Estimators']}"
 
-            mlp_trainers = []
+            param_dict[trainer_id] = param_pack
 
             mlp_trainers.append(iara_trn.RandomForestTrainer(
                                     training_strategy=training_strategy,
-                                    trainer_id = f'{n_mels}',
+                                    trainer_id = trainer_id,
                                     n_targets = config.dataset.target.get_n_targets(),
-                                    n_estimators = 100))
+                                    n_estimators = param_pack['Estimators']))
 
-            manager = iara_exp.Manager(config, *mlp_trainers)
+        manager = iara_exp.Manager(config, *mlp_trainers)
 
-            result_dict = manager.run(folds = folds)
+        result_dict = manager.run(folds = folds)
 
-            for trainer_id, results in result_dict.items():
+        grid = iara_metrics.GridCompiler()
+        for trainer_id, results in result_dict.items():
 
-                for i_fold, result in enumerate(results):
+            for i_fold, result in enumerate(results):
 
-                    grid.add(params={'Number of mels': trainer_id},
-                                i_fold=i_fold,
-                                target=result['Target'],
-                                prediction=result['Prediction'])
+                grid.add(params=param_dict[trainer_id],
+                         i_fold=i_fold,
+                         target=result['Target'],
+                         prediction=result['Prediction'])
 
-    print(grid)
+        print(grid)
 
 
 if __name__ == "__main__":

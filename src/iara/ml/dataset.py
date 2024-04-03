@@ -110,30 +110,17 @@ class ExperimentDataLoader():
         return data_df[offset], torch.tensor(self.target_map[file_id], dtype=torch.int64)
 
     def __str__(self) -> str:
-        total_memory = self.total_memory
-        unity = ['B', 'KB', 'MB', 'GB', 'TB']
-        cont = int(math.log(total_memory, 1024))
-        total_memory /= (1024 ** cont)
-        return f'{self.total_samples} windows in {total_memory} {unity[cont]}'
+        return f'{self.total_samples} windows in {iara.utils.str_format_bytes(self.total_memory)}'
 
 class BaseDataset(torch_data.Dataset):
 
     @abc.abstractmethod
-    def get_dataset_target_distribution(self) -> typing.Dict[int, int]:
-        pass
-
     def get_targets(self) -> torch.tensor:
-        target_map = self.get_dataset_target_distribution()
+        """ Get all targets as tensors """
 
-        tensor_size = sum(target_map.values())
-        target_tensor = torch.zeros(tensor_size, dtype=torch.int32)
-
-        index = 0
-        for key, value in target_map.items():
-            target_tensor[index:index+value] = key
-            index += value
-
-        return target_tensor
+    @abc.abstractmethod
+    def get_samples(self) -> torch.tensor:
+        """ Get all sample as tensors """
 
 class AudioDataset(BaseDataset):
 
@@ -143,6 +130,9 @@ class AudioDataset(BaseDataset):
         self.loader = loader
         self.file_ids = file_ids
         self.limit_ids = [0]
+
+        self.target_tensor = None
+        self.sample_tensor = None
 
         for file_id in self.file_ids:
             self.limit_ids.append(self.limit_ids[-1] + loader.size_map[file_id])
@@ -164,15 +154,29 @@ class AudioDataset(BaseDataset):
         return f'{self.limit_ids[-1]} windows in {iara.utils.str_format_bytes(total_memory)}'
 
     @overrides.override
-    def get_dataset_target_distribution(self) -> typing.Dict[int, int]:
-        target_map = {}
+    def get_targets(self) -> torch.tensor:
 
-        for file_id in self.file_ids:
-            target = self.loader.target_map[file_id]
-            size = self.loader.size_map[file_id]
+        if self.target_tensor is None:
 
-            if target not in target_map:
-                target_map[target] = 0
-            target_map[target] += size
+            self.target_tensor = torch.tensor([], dtype=torch.float32)
 
-        return dict(sorted(target_map.items()))
+            for file_id in self.file_ids:
+                target = self.loader.target_map[file_id]
+                size = self.loader.size_map[file_id]
+
+                self.target_tensor = torch.cat([self.target_tensor,
+                                        torch.tensor([target] * size, dtype=torch.int32)])
+
+        return self.target_tensor
+
+    @overrides.override
+    def get_samples(self) -> torch.tensor:
+
+        if self.sample_tensor is None:
+
+            self.sample_tensor = torch.tensor([], dtype=torch.float32)
+
+            for file_id in self.file_ids:
+                self.sample_tensor = torch.cat([self.sample_tensor, self.loader.data_map[file_id]])
+
+        return self.sample_tensor

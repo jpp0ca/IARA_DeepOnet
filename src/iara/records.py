@@ -254,6 +254,7 @@ class Target(LabelFilter):
             input_df[self.DEFAULT_TARGET_HEADER].astype(int)
         return input_df
 
+
 class CustomCollection:
     """Class representing a selection of collection with targets."""
 

@@ -239,7 +239,7 @@ class OptimizerTrainer(BaseTrainer):
         Returns:
             torch.optim.Optimizer: The allocated optimizer.
         """
-        return torch.optim.Adam(model.parameters(), lr=1e-5)
+        return torch.optim.Adam(model.parameters())
 
     def __init__(self,
                  training_strategy: ModelTrainingStrategy,
@@ -672,7 +672,7 @@ class RandomForestTrainer(BaseTrainer):
         elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
             target_ids = trn_dataset.get_targets()
 
-        samples = trn_dataset.data
+        samples = trn_dataset.get_samples()
 
         if samples is None:
             raise UnboundLocalError("Training dataset without data")
@@ -729,7 +729,7 @@ class RandomForestTrainer(BaseTrainer):
 
             os.makedirs(eval_base_dir, exist_ok=True)
 
-            samples = dataset.data
+            samples = dataset.get_samples()
             targets = dataset.get_targets()
             predictions = []
 

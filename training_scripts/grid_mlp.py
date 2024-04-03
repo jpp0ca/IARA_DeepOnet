@@ -82,7 +82,6 @@ def main(override: bool,
         }
 
 
-
         activation_dict = {
                 'Tanh': torch.nn.Tanh(),
                 'ReLU': torch.nn.ReLU(),
