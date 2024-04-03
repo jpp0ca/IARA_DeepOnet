@@ -353,16 +353,16 @@ class GridCompiler():
 
     def __str__(self) -> str:
 
-        ret = '------- Confusion Matrix -------------\n'
+        # ret = '------- Confusion Matrix -------------\n'
 
-        for hash, dict in self.cv_dict.items():
-            ret += f'-- {dict["params"]} --\n\n'
-            ret += dict['cv'].print_abs_cm()
-            ret += '\n'
-            ret += dict['cv'].print_rel_cm()
-            ret += '\n'
+        # for hash, dict in self.cv_dict.items():
+        #     ret += f'-- {dict["params"]} --\n\n'
+        #     ret += dict['cv'].print_abs_cm()
+        #     ret += '\n'
+        #     ret += dict['cv'].print_rel_cm()
+        #     ret += '\n'
         
-        ret += '\n------- Metric Table -------------\n'
+        ret = '------- Metric Table -------------\n'
         ret += self.as_str()
 
         return ret

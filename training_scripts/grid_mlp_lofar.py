@@ -39,7 +39,7 @@ def main(override: bool,
     config_dir = f"{DEFAULT_DIRECTORIES.config_dir}/{grid_str}"
 
     configs = {
-        f'mlp_{str(training_strategy)}': iara.records.Collection.OS_SHIP
+        f'mlp_lofar_{str(training_strategy)}': iara.records.Collection.OS_SHIP
     }
 
     for config_name, collection in configs.items():
@@ -69,16 +69,16 @@ def main(override: bool,
                             name = config_name,
                             dataset = custom_collection,
                             dataset_processor = iara_default.default_iara_audio_processor(),
-                            output_base_dir = output_base_dir,
-                            n_folds=10 if not only_sample else 3)
+                            output_base_dir = output_base_dir)
 
             config.save(config_dir)
 
         mlp_trainers = []
 
         grid_search = {
-            'Neurons': [4, 8, 16, 32, 64, 128, 256, 512, 1024],
-            'Activation': ['ReLU', 'PReLU']
+            'Neurons': [4, 16, 64, 256, 1024],
+            'Activation': ['Tanh', 'ReLU', 'PReLU'],
+            'Weight decay': [0, 1e-3, 1e-5]
         }
 
 
@@ -92,8 +92,10 @@ def main(override: bool,
 
         combinations = list(itertools.product(*grid_search.values()))
         for combination in combinations:
+            weight_str = f'{param_pack['Weight decay']:.0e}' if param_pack['Weight decay'] != 0 else '0'
+
             param_pack = dict(zip(grid_search.keys(), combination))
-            trainer_id = f"mlp_{param_pack['Neurons']}_{param_pack['Activation']}"
+            trainer_id = f"mlp_{param_pack['Neurons']}_{param_pack['Activation']}_{weight_str}"
 
             param_dict[trainer_id] = param_pack
 
@@ -108,11 +110,9 @@ def main(override: bool,
                                 n_neurons=n_neurons,
                                 n_targets=n_targets,
                                 activation_hidden_layer=activation),
-                    optimizer_allocator=lambda model:
-                        torch.optim.Adam(model.parameters()),
-                    batch_size = 32*1024,
-                    n_epochs = 512,
-                    patience=32))
+                    optimizer_allocator=lambda model, weight_decay=param_pack['Weight decay']:
+                        torch.optim.Adam(model.parameters(),
+                                         weight_decay=weight_decay)))
 
         manager = iara_exp.Manager(config, *mlp_trainers)
 

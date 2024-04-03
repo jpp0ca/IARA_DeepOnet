@@ -1,46 +1,73 @@
-import math
-
+import typing
 import torch
 
-import iara.ml.models.base_model as ml_model
+import iara.ml.models.base_model as iara_model
+import iara.ml.models.mlp as iara_mlp
 
-class CNN(ml_model.Base):
-    def __init__(self, n_channels: int, feature_dim: int, negative_slope: float = 0.2):
+class CNN(iara_model.BaseModel):
+
+    def __init__(self,
+                 input_shape: typing.Iterable[int],
+                 conv_n_neurons: typing.List[int],
+                 classification_n_neurons: int,
+                 conv_activation: torch.nn.Module = torch.nn.LeakyReLU(),
+                 conv_pooling: torch.nn.Module = torch.nn.MaxPool2d(2, 2),
+                 back_norm: bool = True,
+                 kernel_size: int = 5,
+                 padding: int = 2,
+                 n_targets: int = 1,
+                 classification_hidden_activation: torch.nn.Module = None,
+                 classification_output_activation: torch.nn.Module = torch.nn.Sigmoid()):
         super().__init__()
-        self.n_channels = n_channels
-        self.feature_dim = feature_dim
 
-        final_layer_size = 8
+        classification_hidden_activation = conv_activation if classification_hidden_activation is None else classification_hidden_activation
 
-        num_layers = int(round(math.log2(feature_dim)-math.log2(final_layer_size)-1)) # reduzir feature_dim/2 -> 4 - considerando seguidas divisões por 2
+        if len(input_shape) != 3:
+            raise UnboundLocalError("CNN expects as input an image in the format: \
+                                    channel x width x height")
 
-        # input is batch_size x (n_channels x feature_dim x feature_dim)  - batch x imagem
-        layers = [
-            torch.nn.Conv2d(self.n_channels, self.feature_dim, 4, 2, 1, bias=False),
-            torch.nn.LeakyReLU(negative_slope, inplace=True)
-        ]
+        self.input_shape = input_shape
 
-        # state size - (batch_size) x (feature_dim/2 x feature_dim/2)
-        for i in range(num_layers):
-            layers.extend([
-                torch.nn.Conv2d(self.feature_dim * (2**i), self.feature_dim * (2**(i+1)), 4, 2, 1, bias=False),
-                torch.nn.BatchNorm2d(self.feature_dim * (2**(i+1))),
-                torch.nn.LeakyReLU(negative_slope, inplace=True)
-            ])
+        conv_layers = []
+        conv = [self.input_shape[0]]
+        conv.extend(conv_n_neurons)
 
-        # state size - (batch_size) x (final_layer_size x final_layer_size)
-        layers.extend([
-            torch.nn.Conv2d(self.feature_dim * (2**num_layers), 1, 4, 1, 0, bias=False),
-        ])
+        for i in range(1, len(conv)):
+            conv_layers.append(torch.nn.Conv2d(conv[i - 1], conv[i],
+                                               kernel_size=kernel_size, padding=padding))
+            if back_norm:
+                conv_layers.append(torch.nn.BatchNorm2d(conv[i]))
+            conv_layers.append(conv_activation)
+            conv_layers.append(conv_pooling)
 
-        # state size - (batch_size) x (1 x 1)
-        self.model = torch.nn.Sequential(*layers)
+        self.conv_layers = torch.nn.Sequential(*conv_layers)
 
-        self.mlp = torch.nn.Sequential(
-            torch.nn.Flatten(1),
-            torch.nn.Linear((final_layer_size-3)**2, 1),
-            torch.nn.Sigmoid()
-        )
+        test_shape = [1]
+        test_shape.extend(input_shape)
+        test_tensor = torch.rand(test_shape, dtype=torch.float32)
+        test_tensor = self.to_feature_space(test_tensor)
 
-    def forward(self, x):
-        return self.mlp(self.model(x))
+        self.mlp = iara_mlp.MLP(input_shape = test_tensor.shape,
+                                n_neurons = classification_n_neurons,
+                                n_targets = n_targets,
+                                activation_hidden_layer = classification_hidden_activation,
+                                activation_output_layer = classification_output_activation)
+
+
+    def to_feature_space(self, data: torch.Tensor) -> torch.Tensor:
+        return self.conv_layers(data)
+
+
+    def forward(self, data: torch.Tensor) -> torch.Tensor:
+        data = self.to_feature_space(data)
+        data = self.mlp(data)
+        return data
+
+    def __str__(self) -> str:
+        """
+        Return a string representation of the model.
+
+        Returns:
+            str: A string containing the name of the model class.
+        """
+        return f'{super().__str__()} ------- \n' + f'{str(self.conv_layers)}\n' + f'{str(self.mlp)}'

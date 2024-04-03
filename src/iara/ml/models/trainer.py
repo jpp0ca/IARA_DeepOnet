@@ -246,9 +246,9 @@ class OptimizerTrainer(BaseTrainer):
                  trainer_id: str,
                  n_targets: int,
                  model_allocator: typing.Callable[[typing.List[int], int],iara_model.BaseModel],
-                 batch_size: int = 64,
-                 n_epochs: int = 128,
-                 patience: int = 10,
+                 batch_size: int = 64 * 1024,
+                 n_epochs: int = 512,
+                 patience: int = 16,
                  optimizer_allocator: typing.Callable[[iara_model.BaseModel],
                                                       torch.optim.Optimizer]=None,
                  loss_allocator: typing.Callable[[torch.Tensor], torch.nn.Module]=None,
@@ -422,6 +422,7 @@ class OptimizerTrainer(BaseTrainer):
                     best_model_state_dict = partial_trn['best_model_state_dict']
 
             model = model.to(self.device)
+            model.train()
 
             for i_epoch in tqdm.tqdm(range(self.n_epochs), leave=False, desc="Epochs"):
                 n_epochs += 1

@@ -20,6 +20,7 @@ import torchvision
 import iara.ml.dataset as iara_dataset
 import iara.ml.models.trainer as iara_trn
 import iara.ml.models.mlp as iara_mlp
+import iara.ml.models.cnn as iara_cnn
 import iara.ml.metrics as iara_metrics
 
 class Dataset(iara_dataset.BaseDataset):
@@ -56,6 +57,7 @@ class Types(enum.Enum):
     """Model types for training in this test script."""
     MLP=0
     RANDOM_FOREST=1
+    CNN=2
 
     def __str__(self):
         return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
@@ -112,17 +114,17 @@ def main(override: bool, unbalanced: bool, training_type: Types):
                     n_epochs=32,
                     patience=5))
 
-        trainer_list.append(iara_trn.OptimizerTrainer(
-                    training_strategy=iara_trn.ModelTrainingStrategy.CLASS_SPECIALIST,
-                    trainer_id='MLP',
-                    n_targets=10,
-                    model_allocator=lambda input_shape, n_targets:
-                            iara_mlp.MLP(
-                                    input_shape=input_shape,
-                                    n_neurons=32),
-                    batch_size=64,
-                    n_epochs=32,
-                    patience=5))
+        # trainer_list.append(iara_trn.OptimizerTrainer(
+        #             training_strategy=iara_trn.ModelTrainingStrategy.CLASS_SPECIALIST,
+        #             trainer_id='MLP',
+        #             n_targets=10,
+        #             model_allocator=lambda input_shape, n_targets:
+        #                     iara_mlp.MLP(
+        #                             input_shape=input_shape,
+        #                             n_neurons=32),
+        #             batch_size=64,
+        #             n_epochs=32,
+        #             patience=5))
 
     elif training_type == Types.RANDOM_FOREST:
 
@@ -133,12 +135,31 @@ def main(override: bool, unbalanced: bool, training_type: Types):
                     n_estimators=100,
                     max_depth=None))
 
-        trainer_list.append(iara_trn.RandomForestTrainer(
-                    training_strategy=iara_trn.ModelTrainingStrategy.CLASS_SPECIALIST,
-                    trainer_id = 'Forest',
+        # trainer_list.append(iara_trn.RandomForestTrainer(
+        #             training_strategy=iara_trn.ModelTrainingStrategy.CLASS_SPECIALIST,
+        #             trainer_id = 'Forest',
+        #             n_targets=10,
+        #             n_estimators=100,
+        #             max_depth=None))
+
+    elif training_type == Types.CNN:
+
+        trainer_list.append(iara_trn.OptimizerTrainer(
+                    training_strategy=iara_trn.ModelTrainingStrategy.MULTICLASS,
+                    trainer_id='CNN',
                     n_targets=10,
-                    n_estimators=100,
-                    max_depth=None))
+                    model_allocator=lambda input_shape, n_targets:
+                            iara_cnn.CNN(
+                                    input_shape=input_shape,
+                                    conv_activation = torch.nn.ReLU(),
+                                    conv_n_neurons=[32, 64],
+                                    kernel_size=3,
+                                    padding=1,
+                                    classification_n_neurons=128,
+                                    n_targets=n_targets),
+                    batch_size=64,
+                    n_epochs=32,
+                    patience=5))
 
     else:
         raise NotImplementedError('This training type its not implemented')
@@ -159,6 +180,7 @@ def main(override: bool, unbalanced: bool, training_type: Types):
             prediction=result["Prediction"],
             target=result["Target"])
 
+    print('############################')
     print(grid)
 
 if __name__ == "__main__":
