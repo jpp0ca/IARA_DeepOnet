@@ -23,8 +23,8 @@ class CNN(iara_model.BaseModel):
         classification_hidden_activation = conv_activation if classification_hidden_activation is None else classification_hidden_activation
 
         if len(input_shape) != 3:
-            raise UnboundLocalError("CNN expects as input an image in the format: \
-                                    channel x width x height")
+            raise UnboundLocalError(f"CNN expects as input an image in the format: \
+                                    channel x width x height (current {input_shape})")
 
         self.input_shape = input_shape
 

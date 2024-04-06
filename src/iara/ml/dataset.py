@@ -62,7 +62,6 @@ class ExperimentDataLoader():
                                     desc='Processing/Loading dataset', leave=False):
                 future.result()
 
-
     def __load(self, file_id: int, target) -> None:
         """ Process or/and load a single file to data map
 
@@ -89,7 +88,7 @@ class ExperimentDataLoader():
         self.target_map[file_id] = target
         self.memory_map[file_id] = memory
 
-    def get(self, file_id: int, offset: int) -> typing.Tuple[torch.Tensor, torch.Tensor]:
+    def get(self, file_id: int, offset: int, n_samples: int = 1) -> typing.Tuple[torch.Tensor, torch.Tensor]:
         """ Return data and target from offset sample of file_id
 
         Args:
@@ -102,12 +101,19 @@ class ExperimentDataLoader():
         """
 
         if file_id in self.data_map:
-            return self.data_map[file_id][offset], \
-                    torch.tensor(self.target_map[file_id], dtype=torch.int64)
+            sample = self.data_map[file_id][offset:offset+n_samples]
+            target = torch.tensor(self.target_map[file_id], dtype=torch.int64)
+        else:
+            data_df = self.processor.get_data(file_id)
+            data_df = torch.tensor(data_df.values, dtype=torch.float32)
+            sample = data_df[offset:offset+n_samples]
+            target = torch.tensor(self.target_map[file_id], dtype=torch.int64)
 
-        data_df = self.processor.get_data(file_id)
-        data_df = torch.tensor(data_df.values, dtype=torch.float32)
-        return data_df[offset], torch.tensor(self.target_map[file_id], dtype=torch.int64)
+        if n_samples != 1:
+            sample = torch.unsqueeze(sample, dim=0)
+
+        return sample, target
+
 
     def __str__(self) -> str:
         return f'{self.total_samples} windows in {iara.utils.str_format_bytes(self.total_memory)}'
@@ -122,12 +128,36 @@ class BaseDataset(torch_data.Dataset):
     def get_samples(self) -> torch.tensor:
         """ Get all sample as tensors """
 
+class InputType():
+    def __init__(self,
+                n_windows: int = 1,
+                overlap: float = 0) -> None:
+        self.n_windows = n_windows
+        self.n_overlap = int(overlap * n_windows)
+        self.n_news = n_windows - self.n_overlap
+
+        if overlap < 0 or overlap > 1:
+            raise UnboundLocalError(f'Invalid InputType, overlap({overlap}) should be between 0-1')
+
+    def to_n_samples(self, qty_windows: int) -> int:
+        return (qty_windows-self.n_windows)//self.n_news + 1
+
+    @classmethod
+    def Window(cls):
+        return cls(n_windows=1, overlap=0)
+
+    @classmethod
+    def Image(cls, n_windows: int = 1, overlap: float = 0):
+        return cls(n_windows=n_windows, overlap=overlap)
+
 class AudioDataset(BaseDataset):
 
     def __init__(self,
                  loader: ExperimentDataLoader,
+                 input_type: InputType,
                  file_ids: typing.Iterable[int]) -> None:
         self.loader = loader
+        self.input_type = input_type
         self.file_ids = file_ids
         self.limit_ids = [0]
 
@@ -135,7 +165,8 @@ class AudioDataset(BaseDataset):
         self.sample_tensor = None
 
         for file_id in self.file_ids:
-            self.limit_ids.append(self.limit_ids[-1] + loader.size_map[file_id])
+            qty_windows = input_type.to_n_samples(loader.size_map[file_id])
+            self.limit_ids.append(self.limit_ids[-1] + qty_windows)
 
     def __len__(self):
         return self.limit_ids[-1]
@@ -145,7 +176,9 @@ class AudioDataset(BaseDataset):
         current_id = next(i for i, valor in enumerate(self.limit_ids) if valor > index) - 1
         offset_index = index - self.limit_ids[current_id]
 
-        return self.loader.get(self.file_ids[current_id], offset_index)
+        return self.loader.get(self.file_ids[current_id],
+                               offset_index * self.input_type.n_news,
+                               self.input_type.n_windows)
 
     def __str__(self) -> str:
         total_memory = 0

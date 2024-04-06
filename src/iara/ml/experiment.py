@@ -21,7 +21,6 @@ import iara.ml.dataset as iara_dataset
 import iara.ml.models.trainer as iara_trainer
 import iara.processing.manager as iara_manager
 
-
 class Config:
     """Class representing training configuration."""
     TIME_STR_FORMAT = "%Y%m%d-%H%M%S"
@@ -30,11 +29,12 @@ class Config:
                 name: str,
                 dataset: iara.records.CustomCollection,
                 dataset_processor: iara_manager.AudioFileProcessor,
+                input_type: iara_dataset.InputType,
                 output_base_dir: str,
                 n_folds: int = 4,
                 test_factor: float = 0.2,
-                excludent_ship_id = True,
-                outer_splits = 3):
+                outer_splits = 3,
+                excludent_ship_id = True):
         """
         Parameters:
         - name (str): A unique identifier for the training configuration.
@@ -50,6 +50,7 @@ class Config:
         self.name = name
         self.dataset = dataset
         self.dataset_processor = dataset_processor
+        self.input_type = input_type
         self.output_base_dir = os.path.join(output_base_dir, self.name)
         self.n_folds = n_folds
         self.test_factor = test_factor
@@ -182,9 +183,9 @@ class Manager():
         if self.is_trained(i_fold):
             return
 
-        trn_dataset = iara_dataset.AudioDataset(self.get_experiment_loader(), trn_dataset_ids)
+        trn_dataset = iara_dataset.AudioDataset(self.get_experiment_loader(), self.config.input_type, trn_dataset_ids)
 
-        val_dataset = iara_dataset.AudioDataset(self.get_experiment_loader(), val_dataset_ids)
+        val_dataset = iara_dataset.AudioDataset(self.get_experiment_loader(), self.config.input_type, val_dataset_ids)
 
         model_base_dir = self.get_model_base_dir(i_fold)
 
@@ -239,7 +240,8 @@ class Manager():
             return
 
         dataset = iara_dataset.AudioDataset(self.get_experiment_loader(),
-                                              dataset_ids)
+                                            self.config.input_type,
+                                            dataset_ids)
 
         for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
                             tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers"):

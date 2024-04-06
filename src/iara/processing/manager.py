@@ -48,14 +48,6 @@ class PlotType(enum.Enum):
     def __str__(self):
         return str(self.name).rsplit('_', maxsplit=1)[-1].lower()
 
-class InputType(enum.Enum):
-    """Enum defining training types."""
-    WINDOW = 0
-    IMAGE = 1
-
-    def __str__(self):
-        return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
-
 class AudioFileProcessor():
     """ Class for handling acess to process data from a dataset. """
 
@@ -69,7 +61,6 @@ class AudioFileProcessor():
                 n_mels: int = 256,
                 decimation_rate: int = 1,
                 extract_id: typing.Callable[[str], int] = get_iara_id,
-                input_type: InputType = InputType.WINDOW,
                 frequency_limit: float = None,
                 integration_overlap=0,
                 integration_interval=None
@@ -86,7 +77,6 @@ class AudioFileProcessor():
             decimation_rate (int): Decimation rate for use in analysis when mel based.
             extract_id (Callable[[str], str]): Function to extract ID from a file name without
                 extension. Default is split based on '-' em get last part of the name
-            input_type (InputType): Type of input data. Default WINDOW.
             frequency_limit (float): The frequency limit to be considered in the data
                 processing result. Default is fs/2
         """
@@ -99,7 +89,6 @@ class AudioFileProcessor():
         self.n_mels = n_mels
         self.decimation_rate = decimation_rate
         self.extract_id = extract_id
-        self.input_type = input_type
         self.frequency_limit = frequency_limit
         self.integration_overlap = integration_overlap
         self.integration_interval = integration_interval
@@ -125,7 +114,6 @@ class AudioFileProcessor():
             'n_overlap': self.n_overlap,
             'n_mels': self.n_mels,
             'decimation_rate': self.decimation_rate,
-            'input_type': str(self.input_type),
             'frequency_limit': self.frequency_limit,
             'integration_overlap': self.integration_overlap,
             'integration_interval': self.integration_interval,
@@ -199,24 +187,20 @@ class AudioFileProcessor():
         Returns:
             pd.DataFrame: The DataFrame containing the processed data.
         """
-        if self.input_type == InputType.WINDOW:
 
-            os.makedirs(self._get_output_dir(), exist_ok=True)
-            filename = os.path.join(self._get_output_dir(), f'{file_id}.pkl')
+        os.makedirs(self._get_output_dir(), exist_ok=True)
+        filename = os.path.join(self._get_output_dir(), f'{file_id}.pkl')
 
-            if os.path.exists(filename):
-                return pd.read_pickle(filename)
+        if os.path.exists(filename):
+            return pd.read_pickle(filename)
 
-            power, freqs, _ = self._process(file_id)
+        power, freqs, _ = self._process(file_id)
 
-            columns = [f'f {i}' for i in range(len(freqs))]
-            df = pd.DataFrame(power.T, columns=columns)
-            df.to_pickle(filename)
+        columns = [f'f {i}' for i in range(len(freqs))]
+        df = pd.DataFrame(power.T, columns=columns)
+        df.to_pickle(filename)
 
-            return df
-
-        else:
-            raise NotImplementedError(f'input type {str(self.input_type)} not implemented')
+        return df
 
     def get_complete_df(self,
                file_ids: typing.Iterable[int],
