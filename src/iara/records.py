@@ -95,6 +95,12 @@ class Collection(enum.Enum):
     E = 7
     OS_BG = 7
 
+    F = 8
+    GLIDER_CPA_IN = 8
+    G = 9
+    GLIDER_CPA_OUT = 9
+    GLIDER_SHIP = 10
+
     def __str__(self) -> str:
         """Return a string representation of the collection."""
 
@@ -118,6 +124,10 @@ class Collection(enum.Enum):
         if self.value == Collection.E.value:
             return os.path.join(os.path.dirname(__file__), "dataset_info",
                                 "os_bg.csv" if not only_sample else "os_bg_sample.csv")
+        
+        if self.value <= Collection.GLIDER_SHIP.value:
+            return os.path.join(os.path.dirname(__file__), "dataset_info",
+                                "glider_ship.csv" if not only_sample else "glider_ship.csv")
 
         raise UnboundLocalError('info filename not specified')
 
@@ -133,6 +143,9 @@ class Collection(enum.Enum):
             return Collection.A.get_selection_str() + "|" + Collection.B.get_selection_str() + \
                 "|" + Collection.C.get_selection_str() + "|" + Collection.D.get_selection_str()
 
+        if self == Collection.GLIDER_SHIP:
+            return Collection.F.get_selection_str() + "|" + Collection.G.get_selection_str()
+
         return str(self.name).rsplit(".", maxsplit=1)[-1]
 
     def get_prettier_str(self) -> str:
@@ -146,6 +159,9 @@ class Collection(enum.Enum):
             "cpa out",
             "os ship",
             "os bg",
+            "glider cpa in",
+            "glider cpa out",
+            "glider ship",
         ]
         return labels[self.value]
 
