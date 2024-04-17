@@ -69,7 +69,7 @@ def main(override: bool,
             config = iara_exp.Config(
                             name = config_name,
                             dataset = custom_collection,
-                            dataset_processor = iara_default.default_iara_audio_processor(),
+                            dataset_processor = iara_default.default_iara_lofar_audio_processor(),
                             input_type = iara_dataset.InputType.Window(),
                             output_base_dir = output_base_dir)
 

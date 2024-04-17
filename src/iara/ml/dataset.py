@@ -28,7 +28,7 @@ class ExperimentDataLoader():
             When a dataset exceeds this limit, the data is loaded partially as needed (Very low).
         N_WORKERS (int): Number of simultaneos threads to process run files and load data.
     """
-    MEMORY_LIMIT = 5 * 1024 * 1024 * 1024  # gigabytes
+    MEMORY_LIMIT = 1 * 1024 * 1024 * 1024  # bytes
     N_WORKERS = 8
 
     def __init__(self,
@@ -54,6 +54,10 @@ class ExperimentDataLoader():
         self.total_memory = 0
         self.total_samples = 0
 
+    def pre_load(self, file_ids = None) -> None:
+
+        targets = [self.targets[index] for index, id in enumerate(self.file_ids) if id in file_ids]
+
         with ThreadPoolExecutor(max_workers=ExperimentDataLoader.N_WORKERS) as executor:
             futures = [executor.submit(self.__load, file_id, target) 
                        for file_id, target in zip(file_ids, targets)]
@@ -69,6 +73,9 @@ class ExperimentDataLoader():
             file_id (int): IDs of the audio files
             target (_type_): Target labels correspondent
         """        
+
+        if file_id in self.size_map:
+            return
 
         data_df = self.processor.get_data(file_id)
 
@@ -113,7 +120,6 @@ class ExperimentDataLoader():
             sample = torch.unsqueeze(sample, dim=0)
 
         return sample, target
-
 
     def __str__(self) -> str:
         return f'{self.total_samples} windows in {iara.utils.str_format_bytes(self.total_memory)}'
@@ -163,6 +169,8 @@ class AudioDataset(BaseDataset):
 
         self.target_tensor = None
         self.sample_tensor = None
+
+        loader.pre_load(file_ids)
 
         for file_id in self.file_ids:
             qty_windows = input_type.to_n_samples(loader.size_map[file_id])

@@ -67,7 +67,7 @@ def main(override: bool,
                             dataset = custom_collection,
                             dataset_processor = iara_default.default_iara_mel_audio_processor(),
                             output_base_dir = output_base_dir,
-                            n_folds=10 if not only_sample else 3)
+                            kfolds=10 if not only_sample else 3)
 
             config.save(config_dir)
 

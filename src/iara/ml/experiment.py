@@ -31,10 +31,8 @@ class Config:
                 dataset_processor: iara_manager.AudioFileProcessor,
                 input_type: iara_dataset.InputType,
                 output_base_dir: str,
-                n_folds: int = 4,
-                test_factor: float = 0.2,
-                outer_splits = 3,
-                excludent_ship_id = True):
+                test_ratio: float = 0.2,
+                exclusive_ships_on_test = True):
         """
         Parameters:
         - name (str): A unique identifier for the training configuration.
@@ -46,16 +44,13 @@ class Config:
         - test_factor (float, optional): Fraction of the dataset reserved for the test subset.
             Default is 0.2 (20%).
         """
-        self.timestring = datetime.datetime.now().strftime(self.TIME_STR_FORMAT)
         self.name = name
         self.dataset = dataset
         self.dataset_processor = dataset_processor
         self.input_type = input_type
         self.output_base_dir = os.path.join(output_base_dir, self.name)
-        self.n_folds = n_folds
-        self.test_factor = test_factor
-        self.excludent_ship_id = excludent_ship_id
-        self.outer_splits = outer_splits
+        self.test_ratio = test_ratio
+        self.exclusive_ships_on_test = exclusive_ships_on_test
 
     def __str__(self) -> str:
         return  f"----------- {self.name} ----------- \n{str(self.dataset)}"
@@ -79,7 +74,7 @@ class Config:
     def split_datasets(self) -> \
         typing.List[typing.Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]]:
         """
-        Split the dataset into training, validation, and test sets.
+        Split the dataset into training, validation, and test sets. 5x2 cv
 
         Returns:
         - list (list): List of tuples containing training, validation and test sets
@@ -89,23 +84,25 @@ class Config:
 
         split_list = []
 
-        sss = sk_selection.StratifiedShuffleSplit(n_splits=self.outer_splits,
-                                                  test_size=self.test_factor, random_state=42)
+        sss = sk_selection.StratifiedShuffleSplit(n_splits=5,
+                                                  test_size=self.test_ratio,
+                                                  random_state=42)
 
         for trn_val_index, test_index in sss.split(df, df['Target']):
             trn_val_set, test_set = df.iloc[trn_val_index], df.iloc[test_index]
 
             # Move elements with 'Ship ID' present in test set and trn_val_set set to test set
-            if self.excludent_ship_id:
+            if self.exclusive_ships_on_test:
                 for ship_id in test_set['Ship ID'].unique():
                     ship_data = trn_val_set[trn_val_set['Ship ID'] == ship_id]
                     test_set = pd.concat([test_set, ship_data])
                     trn_val_set = trn_val_set[trn_val_set['Ship ID'] != ship_id]
 
-            skf = sk_selection.StratifiedKFold(n_splits=self.n_folds, shuffle=True, random_state=42)
+            skf = sk_selection.StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
 
             for trn_idx, val_idx in skf.split(trn_val_set, trn_val_set['Target']):
                 split_list.append((trn_val_set.iloc[trn_idx], trn_val_set.iloc[val_idx], test_set))
+                split_list.append((trn_val_set.iloc[val_idx], trn_val_set.iloc[trn_idx], test_set))
 
         return split_list
 
@@ -115,6 +112,17 @@ class Config:
                                         df['ID'].to_list(),
                                         df['Target'].to_list())
 
+    def __eq__(self, other):
+        if isinstance(other, Config):
+            return (self.name == other.name and
+                    self.dataset == other.dataset and
+                    self.dataset_processor == other.dataset_processor and
+                    self.input_type == other.input_type and
+                    self.output_base_dir == other.output_base_dir and
+                    self.test_ratio == other.test_ratio and
+                    self.exclusive_ships_on_test == other.exclusive_ships_on_test)
+        return False
+    
 class Manager():
     """Class for managing and executing training based on a Config for multiple trainers"""
 
@@ -139,13 +147,14 @@ class Manager():
     def __str__(self) -> str:
         return f'{self.config.name} with {len(self.trainer_list)} models'
 
-    def __prepare_output_dir(self):
+    def __prepare_output_dir(self, override: bool):
         """ Creates the directory tree for training, keeping backups of conflicting trainings. """
         if os.path.exists(self.config.output_base_dir):
             try:
-                old_config = Config.load(self.config.output_base_dir, self.config.name)
-                if old_config.timestring == self.config.timestring:
-                    return
+                if not override:
+                    old_config = Config.load(self.config.output_base_dir, self.config.name)
+                    if old_config == self.config:
+                        return
 
                 iara.utils.backup_folder(base_dir=self.config.output_base_dir,
                                          time_str_format=Config.TIME_STR_FORMAT)
@@ -159,7 +168,7 @@ class Manager():
     def get_model_base_dir(self, i_fold: int) -> str:
         return os.path.join(self.config.output_base_dir,
                                 'model',
-                                f'{i_fold}_of_{self.config.n_folds}')
+                                f'{i_fold}_of_{self.config.kfolds}')
 
     def is_trained(self, i_fold: int) -> bool:
         model_base_dir = self.get_model_base_dir(i_fold)
@@ -231,7 +240,7 @@ class Manager():
         model_base_dir = self.get_model_base_dir(i_fold)
         eval_base_dir = os.path.join(self.config.output_base_dir,
                                         'eval',
-                                        f'{i_fold}_of_{self.config.n_folds}')
+                                        f'{i_fold}_of_{self.config.kfolds}')
 
         if not self.is_trained(i_fold):
             raise FileNotFoundError(f'Models not trained in {model_base_dir}')
@@ -273,14 +282,14 @@ class Manager():
         for trainer in trainer_list if trainer_list is not None else self.trainer_list:
 
             results = []
-            for i_fold in range(self.config.n_folds):
+            for i_fold in range(self.config.kfolds):
 
                 if folds and i_fold not in folds:
                     continue
 
                 eval_base_dir = os.path.join(self.config.output_base_dir,
                                                 'eval',
-                                                f'{i_fold}_of_{self.config.n_folds}')
+                                                f'{i_fold}_of_{self.config.kfolds}')
 
                 results.append(trainer.eval(dataset_id=dataset_id, eval_base_dir=eval_base_dir))
 
@@ -312,9 +321,9 @@ class Manager():
         print(f'--- Dataset with {len(id_list)} n_folds ---')
         print(df)
 
-    def run(self, folds: typing.List[int] = None) -> typing.Dict:
+    def run(self, folds: typing.List[int] = None, override: bool = False) -> typing.Dict:
         """Execute training based on the Config"""
-        self.__prepare_output_dir()
+        self.__prepare_output_dir(override=override)
         id_list = self.config.split_datasets()
 
         if folds is None or len(folds) == 0:
@@ -392,14 +401,14 @@ class Comparator():
 
             for trainer in trainer_1.trainer_list:
 
-                for i_fold in range(trainer_1.config.n_folds):
+                for i_fold in range(trainer_1.config.kfolds):
 
                     if folds and i_fold not in folds:
                         continue
 
                     model_base_dir = os.path.join(trainer_1.config.output_base_dir,
                                             'model',
-                                            f'{i_fold}_of_{trainer_1.config.n_folds}')
+                                            f'{i_fold}_of_{trainer_1.config.kfolds}')
 
                     evaluation = trainer.eval(
                         dataset_id=f'{trainer_2.config.name}_{str(trainer_1.config.name)}_{i_fold}',

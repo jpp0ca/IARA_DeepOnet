@@ -75,7 +75,7 @@ def main(override: bool, folds: typing.List[int], only_sample: bool):
                         dataset = dataset,
                         dataset_processor = dp,
                         output_base_dir = "./results/trainings",
-                        n_folds=3)
+                        kfolds=3)
 
         config.save(config_dir)
 

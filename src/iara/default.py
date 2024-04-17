@@ -2,6 +2,7 @@ import torch
 
 import iara.ml.experiment as iara_exp
 import iara.ml.models.mlp as iara_mlp
+import iara.records
 import iara.ml.models.trainer as iara_trn
 import iara.processing.analysis as iara_proc
 import iara.processing.manager as iara_manager
@@ -11,13 +12,11 @@ class Directories:
     def __init__(self,
                  data_dir="./data/iara",
                  process_dir="./data/iara_processed",
-                 config_dir="./results/configs",
                  training_dir="./results/trainings",
                  comparison_dir="./results/comparisons",
                  tables_dir="./results/tables"):
         self.data_dir = data_dir
         self.process_dir = process_dir
-        self.config_dir = config_dir
         self.training_dir = training_dir
         self.comparison_dir = comparison_dir
         self.tables_dir = tables_dir
@@ -28,7 +27,7 @@ DEFAULT_DEEPSHIP_DIRECTORIES = Directories(data_dir="/data/deepship",
                                            process_dir="./data/deepship_processed")
 
 
-def default_iara_audio_processor(directories: Directories = DEFAULT_DIRECTORIES):
+def default_iara_lofar_audio_processor(directories: Directories = DEFAULT_DIRECTORIES):
     """Method to get default AudioFileProcessor for iara."""
     return iara_manager.AudioFileProcessor(
         data_base_dir = directories.data_dir,
@@ -98,3 +97,15 @@ def default_trainers(config: iara_exp.Config):
                                     n_estimators = 100))
 
     return trainers
+
+def default_collection(only_sample: bool = False):
+
+    return iara.records.CustomCollection(
+            collection = iara.records.Collection.OS_SHIP,
+            target = iara.records.Target(
+                column = 'TYPE',
+                values = ['Cargo', 'Tanker', 'Tug'],
+                include_others = True
+            ),
+            only_sample=only_sample
+        )
