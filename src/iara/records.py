@@ -330,3 +330,8 @@ class CustomCollection:
             df = df.groupby(self.target.column).size().reset_index(name='Qty')
 
         return df
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, CustomCollection):
+            return self.to_df().equals(other.to_df())
+        return False

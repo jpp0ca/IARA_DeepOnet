@@ -11,6 +11,7 @@ The chosen configuration will then be used for further training and analysis in 
 import typing
 import itertools
 import argparse
+import tqdm
 
 import iara.records
 import iara.ml.experiment as iara_exp
@@ -31,9 +32,10 @@ def main(override: bool,
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
 
-    grid = iara_metrics.GridCompiler()
+    grid_val = iara_metrics.GridCompiler()
+    grid_trn = iara_metrics.GridCompiler()
 
-    for n_mels in [16, 32, 64, 128]:
+    for n_mels in tqdm.tqdm([16, 32, 64, 128], leave=False, desc="N_mels"):
 
         config_name = f'forest_mel_{n_mels}_{str(training_strategy)}'
 
@@ -44,13 +46,13 @@ def main(override: bool,
 
         config = iara_exp.Config(
                         name = config_name,
-                        dataset = iara_default.default_collection(),
+                        dataset = iara_default.default_collection(only_sample=only_sample),
                         dataset_processor = dp,
                         output_base_dir = output_base_dir,
                         input_type = iara_dataset.InputType.Window())
 
         grid_search = {
-            'Estimators': [25, 100, 250]
+            'Estimators': [25, 50, 100, 125, 150]
         }
 
         mlp_trainers = []
@@ -78,12 +80,24 @@ def main(override: bool,
 
             for i_fold, result in enumerate(results):
 
-                grid.add(params=dict({'Number of mels': n_mels}, **param_dict[trainer_id]),
+                grid_val.add(params=dict({'Number of mels': n_mels}, **param_dict[trainer_id]),
                             i_fold=i_fold,
                             target=result['Target'],
                             prediction=result['Prediction'])
 
-    print(grid)
+        result_dict = manager.compile_results(folds = folds, dataset_id='trn', trainer_list=mlp_trainers)
+
+        for trainer_id, results in result_dict.items():
+
+            for i_fold, result in enumerate(results):
+    
+                grid_trn.add(params=dict({'Number of mels': n_mels}, **param_dict[trainer_id]),
+                            i_fold=i_fold,
+                            target=result['Target'],
+                            prediction=result['Prediction'])
+
+    print(grid_trn)
+    print(grid_val)
 
 
 if __name__ == "__main__":

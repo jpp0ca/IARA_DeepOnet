@@ -107,19 +107,23 @@ class ExperimentDataLoader():
             typing.Tuple[torch.Tensor, torch.Tensor]: data, target
         """
 
-        if file_id in self.data_map:
-            sample = self.data_map[file_id][offset:offset+n_samples]
-            target = torch.tensor(self.target_map[file_id], dtype=torch.int64)
-        else:
-            data_df = self.processor.get_data(file_id)
-            data_df = torch.tensor(data_df.values, dtype=torch.float32)
-            sample = data_df[offset:offset+n_samples]
-            target = torch.tensor(self.target_map[file_id], dtype=torch.int64)
+        sample = self.get_all(file_id = file_id)[offset:offset+n_samples]
+        target = torch.tensor(self.target_map[file_id], dtype=torch.int64)
 
         if n_samples != 1:
             sample = torch.unsqueeze(sample, dim=0)
 
         return sample, target
+
+    def get_all(self, file_id: int) -> torch.Tensor:
+
+        if file_id in self.data_map:
+            return self.data_map[file_id]
+
+        data_df = self.processor.get_data(file_id)
+        data_df = torch.tensor(data_df.values, dtype=torch.float32)
+        return data_df
+
 
     def __str__(self) -> str:
         return f'{self.total_samples} windows in {iara.utils.str_format_bytes(self.total_memory)}'
@@ -147,6 +151,13 @@ class InputType():
 
     def to_n_samples(self, qty_windows: int) -> int:
         return (qty_windows-self.n_windows)//self.n_news + 1
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, InputType):
+            return (self.n_windows == other.n_windows and
+                    self.n_overlap == other.n_overlap and
+                    self.n_news == other.n_news)
+        return False
 
     @classmethod
     def Window(cls):
@@ -218,6 +229,6 @@ class AudioDataset(BaseDataset):
             self.sample_tensor = torch.tensor([], dtype=torch.float32)
 
             for file_id in self.file_ids:
-                self.sample_tensor = torch.cat([self.sample_tensor, self.loader.data_map[file_id]])
+                self.sample_tensor = torch.cat([self.sample_tensor, self.loader.get_all(file_id)])
 
         return self.sample_tensor

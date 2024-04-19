@@ -333,3 +333,8 @@ class AudioFileProcessor():
         elif plot_type == PlotType.EXPORT_TEX:
             tikz.save(filename)
             plt.close()
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, AudioFileProcessor):
+            return self._get_hash() == other._get_hash()
+        pass

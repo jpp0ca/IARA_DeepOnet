@@ -1,5 +1,8 @@
 results/
 data/
+results_/
+test_not_commit/
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

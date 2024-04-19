@@ -52,6 +52,9 @@ class Config:
         self.test_ratio = test_ratio
         self.exclusive_ships_on_test = exclusive_ships_on_test
 
+    def get_n_folds(self) -> int:
+        return 10
+
     def __str__(self) -> str:
         return  f"----------- {self.name} ----------- \n{str(self.dataset)}"
 
@@ -102,7 +105,6 @@ class Config:
 
             for trn_idx, val_idx in skf.split(trn_val_set, trn_val_set['Target']):
                 split_list.append((trn_val_set.iloc[trn_idx], trn_val_set.iloc[val_idx], test_set))
-                split_list.append((trn_val_set.iloc[val_idx], trn_val_set.iloc[trn_idx], test_set))
 
         return split_list
 
@@ -153,6 +155,7 @@ class Manager():
             try:
                 if not override:
                     old_config = Config.load(self.config.output_base_dir, self.config.name)
+
                     if old_config == self.config:
                         return
 
@@ -168,7 +171,7 @@ class Manager():
     def get_model_base_dir(self, i_fold: int) -> str:
         return os.path.join(self.config.output_base_dir,
                                 'model',
-                                f'{i_fold}_of_{self.config.kfolds}')
+                                f'fold_{i_fold}')
 
     def is_trained(self, i_fold: int) -> bool:
         model_base_dir = self.get_model_base_dir(i_fold)
@@ -240,7 +243,7 @@ class Manager():
         model_base_dir = self.get_model_base_dir(i_fold)
         eval_base_dir = os.path.join(self.config.output_base_dir,
                                         'eval',
-                                        f'{i_fold}_of_{self.config.kfolds}')
+                                        f'fold_{i_fold}')
 
         if not self.is_trained(i_fold):
             raise FileNotFoundError(f'Models not trained in {model_base_dir}')
@@ -282,14 +285,14 @@ class Manager():
         for trainer in trainer_list if trainer_list is not None else self.trainer_list:
 
             results = []
-            for i_fold in range(self.config.kfolds):
+            for i_fold in range(self.config.get_n_folds()):
 
                 if folds and i_fold not in folds:
                     continue
 
                 eval_base_dir = os.path.join(self.config.output_base_dir,
                                                 'eval',
-                                                f'{i_fold}_of_{self.config.kfolds}')
+                                                f'fold_{i_fold}')
 
                 results.append(trainer.eval(dataset_id=dataset_id, eval_base_dir=eval_base_dir))
 
@@ -351,9 +354,9 @@ class Manager():
                           dataset_id='val',
                           dataset_ids=val_set['ID'].to_list())
 
-                self.eval(i_fold=i_fold,
-                          dataset_id='test',
-                          dataset_ids=test_set['ID'].to_list())
+                # self.eval(i_fold=i_fold,
+                #           dataset_id='test',
+                #           dataset_ids=test_set['ID'].to_list())
 
         return self.compile_results(dataset_id='val',
                                 trainer_list=self.trainer_list,
