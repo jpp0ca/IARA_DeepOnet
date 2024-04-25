@@ -85,26 +85,22 @@ class Config:
         """
         df = self.dataset.to_df()
 
+        df_filtered = df.drop_duplicates(subset='Ship ID')
+
         split_list = []
 
-        sss = sk_selection.StratifiedShuffleSplit(n_splits=5,
-                                                  test_size=self.test_ratio,
-                                                  random_state=42)
-
-        for trn_val_index, test_index in sss.split(df, df['Target']):
-            trn_val_set, test_set = df.iloc[trn_val_index], df.iloc[test_index]
-
-            # Move elements with 'Ship ID' present in test set and trn_val_set set to test set
-            if self.exclusive_ships_on_test:
-                for ship_id in test_set['Ship ID'].unique():
-                    ship_data = trn_val_set[trn_val_set['Ship ID'] == ship_id]
-                    test_set = pd.concat([test_set, ship_data])
-                    trn_val_set = trn_val_set[trn_val_set['Ship ID'] != ship_id]
+        for _ in range(5):
 
             skf = sk_selection.StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
 
-            for trn_idx, val_idx in skf.split(trn_val_set, trn_val_set['Target']):
-                split_list.append((trn_val_set.iloc[trn_idx], trn_val_set.iloc[val_idx], test_set))
+            for trn_idx, val_idx in skf.split(df_filtered, df_filtered['Target']):
+                train_ship_ids = df_filtered.iloc[trn_idx]['Ship ID']
+                test_ship_ids = df_filtered.iloc[val_idx]['Ship ID']
+
+                train_data = df[df['Ship ID'].isin(train_ship_ids)]
+                test_data = df[df['Ship ID'].isin(test_ship_ids)]
+
+                split_list.append((train_data, test_data, []))
 
         return split_list
 
@@ -205,7 +201,7 @@ class Manager():
                         desc=f'Trn({str(trn_dataset)}) Val({str(val_dataset)})'):
 
             for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
-                                tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers"):
+                            tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers", ncols=120):
 
                 iara.utils.set_seed()
 
@@ -256,7 +252,7 @@ class Manager():
                                             dataset_ids)
 
         for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
-                            tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers"):
+                            tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers", ncols=120):
 
             trainer.eval(dataset_id=dataset_id,
                          model_base_dir=model_base_dir,
@@ -309,15 +305,15 @@ class Manager():
 
             df_trn = self.config.dataset.to_compiled_df(trn_set)
             df_val = self.config.dataset.to_compiled_df(val_set)
-            df_test = self.config.dataset.to_compiled_df(test_set)
+            # df_test = self.config.dataset.to_compiled_df(test_set)
 
             df_trn = df_trn.rename(columns={'Qty': f'Trn_{i_fold}'})
             df_val = df_val.rename(columns={'Qty': f'Val_{i_fold}'})
-            df_test = df_test.rename(columns={'Qty': f'Test_{i_fold}'})
+            # df_test = df_test.rename(columns={'Qty': f'Test_{i_fold}'})
 
             df = pd.merge(df, df_trn, on=self.config.dataset.target.column)
             df = pd.merge(df, df_val, on=self.config.dataset.target.column)
-            df = pd.merge(df, df_test, on=self.config.dataset.target.column)
+            # df = pd.merge(df, df_test, on=self.config.dataset.target.column)
 
             break
 
@@ -339,7 +335,8 @@ class Manager():
             for i_fold in folds if len(folds) == 1 else \
                                     tqdm.tqdm(folds,
                                               leave=False,
-                                              desc="Fold"):
+                                              desc="Fold",
+                                              ncols=120):
                 (trn_set, val_set, test_set) = id_list[i_fold]
 
                 self.fit(i_fold=i_fold,

@@ -14,6 +14,7 @@ import argparse
 
 import iara.records
 import iara.ml.experiment as iara_exp
+import iara.ml.dataset as iara_dataset
 import iara.ml.models.trainer as iara_trn
 import iara.ml.metrics as iara_metrics
 
@@ -23,84 +24,72 @@ from iara.default import DEFAULT_DIRECTORIES
 def main(override: bool,
         folds: typing.List[int],
         only_sample: bool,
-        include_other: bool,
         training_strategy: iara_trn.ModelTrainingStrategy):
     """Grid search main function"""
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
 
-    config_dir = f"{DEFAULT_DIRECTORIES.config_dir}/{grid_str}"
+    grid_val = iara_metrics.GridCompiler()
+    grid_trn = iara_metrics.GridCompiler()
 
-    configs = {
-        f'forest_lofar_{str(training_strategy)}': iara.records.Collection.OS_SHIP
+    config_name = f'forest_lofar_{str(training_strategy)}'
+    output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
+
+    config = iara_exp.Config(
+                    name = config_name,
+                    dataset = iara_default.default_collection(only_sample=only_sample),
+                    dataset_processor = iara_default.default_iara_lofar_audio_processor(),
+                    output_base_dir = output_base_dir,
+                        input_type = iara_dataset.InputType.Window())
+
+    grid_search = {
+        'Estimators': [25, 50, 100, 125, 150],
+        'Max depth': [None, 10, 20, 30]
     }
 
-    for config_name, collection in configs.items():
+    mlp_trainers = []
+    param_dict = {}
 
-        config = False
-        if not override:
-            try:
-                config = iara_exp.Config.load(config_dir, config_name)
+    combinations = list(itertools.product(*grid_search.values()))
+    for combination in combinations:
+        param_pack = dict(zip(grid_search.keys(), combination))
+        trainer_id = f"forest_estimator[{param_pack['Estimators']}]_depth[{param_pack['Max depth']}]"
 
-            except FileNotFoundError:
-                pass
+        param_dict[trainer_id] = param_pack
 
-        if not config:
-            custom_collection = iara.records.CustomCollection(
-                            collection = collection,
-                            target = iara.records.Target(
-                                column = 'TYPE',
-                                values = ['Cargo', 'Tanker', 'Tug'],
-                                include_others = include_other
-                            ),
-                            only_sample=only_sample
-                        )
+        mlp_trainers.append(iara_trn.RandomForestTrainer(
+                                training_strategy=training_strategy,
+                                trainer_id = trainer_id,
+                                n_targets = config.dataset.target.get_n_targets(),
+                                n_estimators = param_pack['Estimators'],
+                                max_depth = param_pack['Max depth']))
 
-            output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
+    manager = iara_exp.Manager(config, *mlp_trainers)
 
-            config = iara_exp.Config(
-                            name = config_name,
-                            dataset = custom_collection,
-                            dataset_processor = iara_default.default_iara_lofar_audio_processor(),
-                            output_base_dir = output_base_dir)
+    result_dict = manager.run(folds = folds)
 
-            config.save(config_dir)
+    for trainer_id, results in result_dict.items():
 
-        grid_search = {
-            'Estimators': [25, 100, 250, 500]
-        }
+        for i_fold, result in enumerate(results):
 
-        mlp_trainers = []
-        param_dict = {}
+            grid_val.add(params=param_dict[trainer_id],
+                        i_fold=i_fold,
+                        target=result['Target'],
+                        prediction=result['Prediction'])
 
-        combinations = list(itertools.product(*grid_search.values()))
-        for combination in combinations:
-            param_pack = dict(zip(grid_search.keys(), combination))
-            trainer_id = f"forest_{param_pack['Estimators']}"
+    result_dict = manager.compile_results(folds = folds, dataset_id='trn', trainer_list=mlp_trainers)
 
-            param_dict[trainer_id] = param_pack
+    for trainer_id, results in result_dict.items():
 
-            mlp_trainers.append(iara_trn.RandomForestTrainer(
-                                    training_strategy=training_strategy,
-                                    trainer_id = trainer_id,
-                                    n_targets = config.dataset.target.get_n_targets(),
-                                    n_estimators = param_pack['Estimators']))
+        for i_fold, result in enumerate(results):
 
-        manager = iara_exp.Manager(config, *mlp_trainers)
+            grid_trn.add(params=param_dict[trainer_id],
+                        i_fold=i_fold,
+                        target=result['Target'],
+                        prediction=result['Prediction'])
 
-        result_dict = manager.run(folds = folds)
-
-        grid = iara_metrics.GridCompiler()
-        for trainer_id, results in result_dict.items():
-
-            for i_fold, result in enumerate(results):
-
-                grid.add(params=param_dict[trainer_id],
-                         i_fold=i_fold,
-                         target=result['Target'],
-                         prediction=result['Prediction'])
-
-        print(grid)
+    print(grid_trn)
+    print(grid_val)
 
 
 if __name__ == "__main__":
@@ -111,8 +100,6 @@ if __name__ == "__main__":
                         help='Ignore old runs')
     parser.add_argument('--only_sample', action='store_true', default=False,
                         help='Execute only in sample_dataset. For quick training and test.')
-    parser.add_argument('--exclude_other', action='store_true', default=False,
-                        help='Include records besides than [Cargo, Tanker, Tug] in training.')
     parser.add_argument('--training_strategy', type=str, choices=strategy_str_list,
                         default=None, help='Strategy for training the model')
     parser.add_argument('--fold', type=str, default='',
@@ -136,7 +123,6 @@ if __name__ == "__main__":
         main(override = args.override,
             folds = folds_to_execute,
             only_sample = args.only_sample,
-            include_other = not args.exclude_other,
             training_strategy = iara_trn.ModelTrainingStrategy(index))
 
     else:
@@ -144,5 +130,4 @@ if __name__ == "__main__":
             main(override = args.override,
                 folds = folds_to_execute,
                 only_sample = args.only_sample,
-                include_other = not args.exclude_other,
                 training_strategy = strategy)

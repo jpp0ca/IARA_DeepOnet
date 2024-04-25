@@ -63,7 +63,7 @@ class ExperimentDataLoader():
                        for file_id, target in zip(file_ids, targets)]
 
             for future in tqdm.tqdm(as_completed(futures), total=len(futures),
-                                    desc='Processing/Loading dataset', leave=False):
+                                    desc='Processing/Loading dataset', leave=False, ncols=120):
                 future.result()
 
     def __load(self, file_id: int, target) -> None:

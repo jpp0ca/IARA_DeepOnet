@@ -35,13 +35,14 @@ def main(override: bool,
     grid_val = iara_metrics.GridCompiler()
     grid_trn = iara_metrics.GridCompiler()
 
-    for n_mels in tqdm.tqdm([16, 32, 64, 128], leave=False, desc="N_mels"):
+    for n_mels in tqdm.tqdm([16, 64], leave=False, desc="N_mels", ncols=120):
 
         config_name = f'forest_mel_{n_mels}_{str(training_strategy)}'
 
         output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
 
         dp = iara_default.default_iara_mel_audio_processor()
+        dp.normalization = iara_proc.Normalization.MIN_MAX
         dp.n_mels = n_mels
 
         config = iara_exp.Config(
@@ -49,10 +50,12 @@ def main(override: bool,
                         dataset = iara_default.default_collection(only_sample=only_sample),
                         dataset_processor = dp,
                         output_base_dir = output_base_dir,
-                        input_type = iara_dataset.InputType.Window())
+                        input_type = iara_dataset.InputType.Window(),
+                        exclusive_ships_on_test=False)
 
         grid_search = {
-            'Estimators': [25, 50, 100, 125, 150]
+            'Estimators': [25, 50], #, 125, 150
+            'Max depth': [10, 30] #None
         }
 
         mlp_trainers = []
@@ -61,7 +64,7 @@ def main(override: bool,
         combinations = list(itertools.product(*grid_search.values()))
         for combination in combinations:
             param_pack = dict(zip(grid_search.keys(), combination))
-            trainer_id = f"forest_{param_pack['Estimators']}"
+            trainer_id = f"forest_estimator[{param_pack['Estimators']}]_depth[{param_pack['Max depth']}]"
 
             param_dict[trainer_id] = param_pack
 
@@ -69,7 +72,8 @@ def main(override: bool,
                                     training_strategy=training_strategy,
                                     trainer_id = trainer_id,
                                     n_targets = config.dataset.target.get_n_targets(),
-                                    n_estimators = param_pack['Estimators']))
+                                    n_estimators = param_pack['Estimators'],
+                                    max_depth = param_pack['Max depth']))
 
 
         manager = iara_exp.Manager(config, *mlp_trainers)

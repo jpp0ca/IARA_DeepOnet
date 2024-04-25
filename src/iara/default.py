@@ -107,5 +107,10 @@ def default_collection(only_sample: bool = False):
                 values = ['Cargo', 'Tanker', 'Tug'],
                 include_others = True
             ),
+            # target = iara.records.Target(
+            #     column = 'DETAILED TYPE',
+            #     values = ['Pilot Vessel', 'Motor Hopper'],
+            #     include_others = False
+            # ),
             only_sample=only_sample
         )

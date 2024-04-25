@@ -386,7 +386,7 @@ class OptimizerTrainer(BaseTrainer):
 
 
         for target_id, (model, optimizer, loss_module) in container if (len(container) == 1) else \
-                    tqdm.tqdm(container, leave=False, desc="Classes"):
+                    tqdm.tqdm(container, leave=False, desc="Classes", ncols=120):
 
             model_filename = self.output_filename(model_base_dir=model_base_dir,
                                               target_id=target_id)
@@ -424,7 +424,7 @@ class OptimizerTrainer(BaseTrainer):
             model = model.to(self.device)
             model.train()
 
-            for i_epoch in tqdm.tqdm(range(self.n_epochs), leave=False, desc="Epochs"):
+            for i_epoch in tqdm.tqdm(range(self.n_epochs), leave=False, desc="Epochs", ncols=120):
                 n_epochs += 1
 
                 if partial_trn is not None:
@@ -434,7 +434,7 @@ class OptimizerTrainer(BaseTrainer):
                 running_loss = []
                 for samples, targets in tqdm.tqdm(trn_loader,
                                                   leave=False,
-                                                  desc="Training Batchs"):
+                                                  desc="Training Batchs", ncols=120):
 
                     optimizer.zero_grad()
 
@@ -461,7 +461,7 @@ class OptimizerTrainer(BaseTrainer):
                 with torch.no_grad():
                     for samples, targets in tqdm.tqdm(val_loader,
                                                       leave=False,
-                                                      desc="Evaluating Batch"):
+                                                      desc="Evaluating Batch", ncols=120):
 
                         if target_id is not None:
                             targets = torch.where(targets == target_id,
@@ -582,7 +582,7 @@ class OptimizerTrainer(BaseTrainer):
                 model = iara_model.BaseModel.load(filename)
                 model.eval()
 
-                for samples, targets in tqdm.tqdm(loader, leave=False, desc="Eval Batchs"):
+                for samples, targets in tqdm.tqdm(loader, leave=False, desc="Eval Batchs", ncols=120):
                     targets = targets.to(self.device)
                     samples = samples.to(self.device)
                     predictions = model(samples)
@@ -605,7 +605,7 @@ class OptimizerTrainer(BaseTrainer):
                     model.eval()
                     models.append(model)
 
-                for samples, targets in tqdm.tqdm(loader, leave=False, desc="Eval Batchs"):
+                for samples, targets in tqdm.tqdm(loader, leave=False, desc="Eval Batchs", ncols=120):
                     samples = samples.to(self.device)
 
                     predictions = torch.zeros((len(targets), len(models)))

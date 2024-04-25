@@ -224,7 +224,7 @@ class AudioFileProcessor():
         result_target = pd.Series()
 
         for local_id, target in tqdm.tqdm(
-                                list(zip(file_ids, targets)), desc='Get data', leave=False):
+                                list(zip(file_ids, targets)), desc='Get data', leave=False, ncols=120):
             data_df = self.get_data(local_id)
             result_df = pd.concat([result_df, data_df], ignore_index=True)
 
@@ -259,7 +259,7 @@ class AudioFileProcessor():
             self._save()
 
         if not isinstance(file_id, int):
-            for local_id in tqdm.tqdm(file_id, desc='Plot', leave=False):
+            for local_id in tqdm.tqdm(file_id, desc='Plot', leave=False, ncols=120):
                 self.plot(
                     file_id = local_id,
                     plot_type = plot_type,
