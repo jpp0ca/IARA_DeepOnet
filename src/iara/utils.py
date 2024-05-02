@@ -22,7 +22,7 @@ def get_available_device() -> torch.device:
     Returns:
         torch.device: The available device, either 'cuda' (GPU) or 'cpu'.
     """
-    return torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    return torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 def print_available_device():
     """ Print the available device for computation. """

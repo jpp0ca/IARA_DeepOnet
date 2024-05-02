@@ -43,8 +43,8 @@ def main(override: bool,
                         input_type = iara_dataset.InputType.Window())
 
     grid_search = {
-        'Estimators': [25, 50, 100, 125, 150],
-        'Max depth': [None, 10, 20, 30]
+        'Estimators': [10, 20, 30, 40, 50],
+        'Max depth': [5, 10, 15, 20, 25, 30]
     }
 
     mlp_trainers = []

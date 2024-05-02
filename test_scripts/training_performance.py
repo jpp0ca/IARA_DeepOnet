@@ -14,6 +14,8 @@ import iara.ml.dataset as iara_dataset
 import iara.default as iara_default
 from iara.default import DEFAULT_DIRECTORIES
 
+iara.utils.print_available_device()
+
 class MLP(torch.nn.Module):
     def __init__(self, input_size, n_neurons, n_targets):
         super(MLP, self).__init__()
@@ -27,15 +29,15 @@ class MLP(torch.nn.Module):
         return x
 
 custom_collection = iara.records.CustomCollection(
-                collection = iara.records.Collection.OS_SHIP,
+                collection = iara.records.Collection.A,
                 filters = iara.records.LabelFilter(
                     column='TYPE',
                     values=['Cargo']
                 ),
                 target = iara.records.Target(
-                    column = 'DETAILED TYPE',
-                    values = ['Bulk Carrier', 'Container Ship', 'General Cargo'],
-                    include_others = False
+                    column = 'TYPE',
+                    values = ['Cargo', 'Tanker', 'Tug'],
+                    include_others = True
                 ),
                 only_sample=True,
             )
@@ -46,8 +48,8 @@ config = iara_exp.Config(
                 name = 'performance',
                 dataset = custom_collection,
                 dataset_processor = iara_default.default_iara_lofar_audio_processor(),
+                input_type = iara_dataset.InputType.Window(),
                 output_base_dir = output_base_dir,
-                kfolds=4,
                 exclusive_ships_on_test=False)
 
 list = config.split_datasets()
@@ -65,14 +67,14 @@ experiment_loader = iara_dataset.ExperimentDataLoader(config.dataset_processor,
                                 df['Target'].to_list())
 
 
-for n_neurons in tqdm.tqdm([4, 16, 64, 256], desc='Trainers', leave=False):
+for n_neurons in tqdm.tqdm([16], desc='Trainers', leave=False):
 
     for i_fold, (trn_set, val_set, test_set) in \
             enumerate(tqdm.tqdm(list, desc='Fold', leave=False)):
 
-        trn_dataset = iara_dataset.AudioDataset(experiment_loader, trn_set['ID'].to_list())
+        trn_dataset = iara_dataset.AudioDataset(experiment_loader, config.input_type, trn_set['ID'].to_list())
 
-        val_dataset = iara_dataset.AudioDataset(experiment_loader, val_set['ID'].to_list())
+        val_dataset = iara_dataset.AudioDataset(experiment_loader, config.input_type, val_set['ID'].to_list())
 
         trn_loader = torch_data.DataLoader(trn_dataset,
                                            batch_size=batch_size,
