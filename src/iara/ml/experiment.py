@@ -108,7 +108,8 @@ class Config:
         df = self.dataset.to_df()
         return iara_dataset.ExperimentDataLoader(self.dataset_processor,
                                         df['ID'].to_list(),
-                                        df['Target'].to_list())
+                                        df['Target'].to_list(),
+                                        df['CPA time'].to_list())
 
     def __eq__(self, other):
         if isinstance(other, Config):
@@ -120,7 +121,8 @@ class Config:
                     self.test_ratio == other.test_ratio and
                     self.exclusive_ships_on_test == other.exclusive_ships_on_test)
         return False
-    
+
+
 class Manager():
     """Class for managing and executing training based on a Config for multiple trainers"""
 

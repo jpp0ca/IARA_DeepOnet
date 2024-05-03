@@ -28,13 +28,16 @@ class ExperimentDataLoader():
             When a dataset exceeds this limit, the data is loaded partially as needed (Very low).
         N_WORKERS (int): Number of simultaneos threads to process run files and load data.
     """
-    MEMORY_LIMIT = 1 * 1024 * 1024 * 1024  # bytes
+    MEMORY_LIMIT = 2 * 1024 * 1024 * 1024  # bytes
     N_WORKERS = 8
 
     def __init__(self,
                  processor: iara_proc_manager.AudioFileProcessor,
                  file_ids: typing.Iterable[int],
-                 targets: typing.Iterable) -> None:
+                 targets: typing.Iterable,
+                 central_offset_time: typing.Iterable[float] = None,
+                 max_interval: int = 120 #seconds
+                 ) -> None:
         """
         Args:
             processor (iara.processing.manager.AudioFileProcessor): An instance of the
@@ -53,6 +56,8 @@ class ExperimentDataLoader():
         self.memory_map = {}
         self.total_memory = 0
         self.total_samples = 0
+        self.central_offset_time = central_offset_time
+        self.max_interval = max_interval
 
     def pre_load(self, file_ids = None) -> None:
 
@@ -66,6 +71,32 @@ class ExperimentDataLoader():
                                     desc='Processing/Loading dataset', leave=False, ncols=120):
                 future.result()
 
+    def __get(self, file_id: int) -> pd.DataFrame:
+        try:
+
+            data_df, times = self.processor.get_data(file_id)
+            times = np.array(times)
+
+            if self.central_offset_time is not None:
+                index = list(self.file_ids).index(file_id)
+                offset =  list(self.central_offset_time)[index]
+
+                try:
+                    offset = int(offset) - self.max_interval/2
+                except ValueError:
+                    offset = times[0]
+
+                indexes = np.where((times >= offset) & (times <= offset + self.max_interval))[0]
+
+                return data_df.iloc[indexes]
+
+            return data_df
+
+        except Exception as e:
+            # Tratar o erro capturando qualquer exceção
+            print(f"Ocorreu um erro: {e}")
+
+
     def __load(self, file_id: int, target) -> None:
         """ Process or/and load a single file to data map
 
@@ -77,7 +108,7 @@ class ExperimentDataLoader():
         if file_id in self.size_map:
             return
 
-        data_df = self.processor.get_data(file_id)
+        data_df = self.__get(file_id)
 
         memory = data_df.memory_usage(deep=True).sum()
 
@@ -120,7 +151,7 @@ class ExperimentDataLoader():
         if file_id in self.data_map:
             return self.data_map[file_id]
 
-        data_df = self.processor.get_data(file_id)
+        data_df = self.__get(file_id)
         data_df = torch.tensor(data_df.values, dtype=torch.float32)
         return data_df
 

@@ -177,30 +177,25 @@ class AudioFileProcessor():
 
         return power, freqs, times
 
-    def get_data(self, file_id: int) -> pd.DataFrame:
-        """
-        Get data for the given ID.
-
-        Parameters:
-            file_id (int): The ID to get data for.
-
-        Returns:
-            pd.DataFrame: The DataFrame containing the processed data.
-        """
+    def get_data(self, file_id: int) -> typing.Tuple[pd.DataFrame, np.array]:
 
         os.makedirs(self._get_output_dir(), exist_ok=True)
         filename = os.path.join(self._get_output_dir(), f'{file_id}.pkl')
 
         if os.path.exists(filename):
-            return pd.read_pickle(filename)
+            data = pd.read_pickle(filename)
+            return data['df'], data['times']
 
-        power, freqs, _ = self._process(file_id)
+        power, freqs, times = self._process(file_id)
 
         columns = [f'f {i}' for i in range(len(freqs))]
         df = pd.DataFrame(power.T, columns=columns)
         df.to_pickle(filename)
 
-        return df
+        data_to_save = {'df': df, 'times': times}
+        pd.to_pickle(data_to_save, filename)
+
+        return df, times
 
     def get_complete_df(self,
                file_ids: typing.Iterable[int],
@@ -337,4 +332,4 @@ class AudioFileProcessor():
     def __eq__(self, other: object) -> bool:
         if isinstance(other, AudioFileProcessor):
             return self._get_hash() == other._get_hash()
-        pass
+        return False

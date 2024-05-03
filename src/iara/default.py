@@ -36,7 +36,8 @@ def default_iara_lofar_audio_processor(directories: Directories = DEFAULT_DIRECT
         analysis = iara_proc.SpectralAnalysis.LOFAR,
         n_pts = 1024,
         n_overlap = 0,
-        decimation_rate = 3
+        decimation_rate = 3,
+        integration_interval=2.048
     )
 
 def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTORIES):
@@ -49,7 +50,8 @@ def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTOR
         n_pts = 1024,
         n_overlap = 0,
         decimation_rate = 3,
-        n_mels=64,
+        n_mels=32,
+        integration_interval=2.048
     )
 
 def default_deepship_audio_processor(directories: Directories = DEFAULT_DEEPSHIP_DIRECTORIES):
