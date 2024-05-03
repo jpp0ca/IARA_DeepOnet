@@ -10,7 +10,7 @@ import math
 
 import numpy as np
 import sklearn.metrics as sk_metrics
-
+import scipy.stats as scipy
 
 class Metric(enum.Enum):
     """Enumeration representing metrics for model analysis.
@@ -22,6 +22,8 @@ class Metric(enum.Enum):
     BALANCED_ACCURACY = 2
     MICRO_F1 = 3
     MACRO_F1 = 4
+    DETECTION_PROBABILITY = 5
+    SP_INDEX = 6
 
     def __str__(self):
         """Return the string representation of the Metric enum."""
@@ -34,6 +36,8 @@ class Metric(enum.Enum):
             __class__.BALANCED_ACCURACY: "BALANCED_ACCURACY",
             __class__.MICRO_F1: "MICRO_F1",
             __class__.MACRO_F1: "MACRO_F1",
+            __class__.DETECTION_PROBABILITY: "DETECTION_PROBABILITY",
+            __class__.SP_INDEX: "SP_INDEX",
         }
         return en_labels[self]
 
@@ -58,6 +62,19 @@ class Metric(enum.Enum):
 
         if self == Metric.MACRO_F1:
             return sk_metrics.f1_score(target, prediction, average='macro') * 100
+
+        if self == Metric.DETECTION_PROBABILITY:
+            cm = sk_metrics.confusion_matrix(target, prediction, labels=list(set(list(target))))
+            detection_probabilities = cm.diagonal() / cm.sum(axis=1)
+            return np.mean(detection_probabilities) * 100
+
+        if self == Metric.SP_INDEX:
+            cm = sk_metrics.confusion_matrix(target, prediction, labels=list(set(list(target))))
+            detection_probabilities = cm.diagonal() / cm.sum(axis=1)
+            geometric_mean = scipy.gmean(detection_probabilities)
+            return np.sqrt(np.mean(detection_probabilities * geometric_mean)) * 100
+
+
 
         raise NotImplementedError(f"Evaluation for Metric {self} is not implemented.")
 
@@ -257,7 +274,10 @@ class GridCompiler():
     This class compiles the results of grid search evaluations, including metric scores for each
     combination of parameters and each metric, and provides methods for formatting the results.
     """
-    default_metric_list = Metric
+    default_metric_list = [Metric.BALANCED_ACCURACY,
+                           Metric.SP_INDEX,
+                           Metric.ACCURACY,
+                           Metric.DETECTION_PROBABILITY]
     default_fig_size = (10, 7)
 
     def __init__(self, metric_list: typing.List['Metric'] = default_metric_list):
