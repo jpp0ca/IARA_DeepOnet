@@ -51,7 +51,7 @@ def main(override: bool, only_sample: bool, include_others: bool):
 
         dataset = iara.records.CustomCollection(
                         collection = colletion,
-                        target = iara.records.Target(
+                        target = iara.records.LabelTarget(
                             column = 'TYPE',
                             values = values,
                             include_others = include_others

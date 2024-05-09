@@ -95,11 +95,13 @@ class Collection(enum.Enum):
     E = 7
     OS_BG = 7
 
-    F = 8
-    GLIDER_CPA_IN = 8
-    G = 9
-    GLIDER_CPA_OUT = 9
-    GLIDER_SHIP = 10
+    OS = 8
+
+    F = 9
+    GLIDER_CPA_IN = 9
+    G = 10
+    GLIDER_CPA_OUT = 10
+    GLIDER_SHIP = 11
 
     def __str__(self) -> str:
         """Return a string representation of the collection."""
@@ -113,6 +115,9 @@ class Collection(enum.Enum):
         if self == Collection.OS_SHIP:
             return 'Total'
 
+        if self == Collection.OS:
+            return 'OS'
+
         return str(self.name).rsplit(".", maxsplit=1)[-1]
 
     def _get_info_filename(self, only_sample: bool = False) -> str:
@@ -124,7 +129,7 @@ class Collection(enum.Enum):
         if self.value == Collection.E.value:
             return os.path.join(os.path.dirname(__file__), "dataset_info",
                                 "os_bg.csv" if not only_sample else "os_bg_sample.csv")
-        
+
         if self.value <= Collection.GLIDER_SHIP.value:
             return os.path.join(os.path.dirname(__file__), "dataset_info",
                                 "glider_ship.csv" if not only_sample else "glider_ship.csv")
@@ -143,6 +148,11 @@ class Collection(enum.Enum):
             return Collection.A.get_selection_str() + "|" + Collection.B.get_selection_str() + \
                 "|" + Collection.C.get_selection_str() + "|" + Collection.D.get_selection_str()
 
+        if self == Collection.OS:
+            return Collection.A.get_selection_str() + "|" + Collection.B.get_selection_str() + \
+                "|" + Collection.C.get_selection_str() + "|" + Collection.D.get_selection_str()+ \
+                "|" + Collection.E.get_selection_str() 
+
         if self == Collection.GLIDER_SHIP:
             return Collection.F.get_selection_str() + "|" + Collection.G.get_selection_str()
 
@@ -159,6 +169,7 @@ class Collection(enum.Enum):
             "cpa out",
             "os ship",
             "os bg",
+            "os",
             "glider cpa in",
             "glider cpa out",
             "glider ship",
@@ -176,7 +187,22 @@ class Collection(enum.Enum):
         Returns:
             pd.DataFrame: A DataFrame containing detailed information about the collection.
         """
-        df = pd.read_csv(self._get_info_filename(only_sample=only_sample))
+        if self == Collection.OS:
+            df_ship = Collection.OS_SHIP.to_df(only_sample=only_sample)
+            df_bg = Collection.OS_BG.to_df(only_sample=only_sample)
+            # print(df_bg)
+            # print(df_ship)
+            # for column in ['ID', 'Dataset', 'Rain', 'Temperature', 'Wind', 'Sea state', 'Rain state']:
+            # for column in ['Rain', 'Temperature', 'Wind']:
+            #     print('column: ', column)
+            #     # print(df_ship[column].apply(type).value_counts())
+            #     # print(df_bg[column].apply(type).value_counts())
+            #     invalid = df_ship[column][~df_ship[column].str.match(r'^-?\d+(\.\d+)?$')]
+            #     print(invalid)
+
+            df = pd.merge(df_ship, df_bg, how='outer')
+            return df
+        df = pd.read_csv(self._get_info_filename(only_sample=only_sample), na_values=[" - "])
         return df.loc[df['Dataset'].str.contains(self.get_selection_str())]
 
 class Filter():
@@ -219,9 +245,28 @@ class LabelFilter():
         """
         return input_df.loc[input_df[self.column].isin(self.values)]
 
-class Target(LabelFilter):
-    """Class representing a training target for a dataset."""
+class Target(Filter):
     DEFAULT_TARGET_HEADER = 'Target'
+    def __init__(self,
+                 n_targets: int,
+                 include_others: bool):
+        self.n_targets = n_targets
+        self.include_others = include_others
+
+    def get_n_targets(self) -> int:
+        """Return the number of targets."""
+        return self.n_targets + (1 if self.include_others else 0)
+
+    @abc.abstractmethod
+    def apply(self, input_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        """
+
+    def grouped_column(self) -> str:
+        return self.DEFAULT_TARGET_HEADER
+
+class LabelTarget(LabelFilter, Target):
+    """Class representing a training target for a dataset."""
 
     def __init__(self,
                  column: str,
@@ -234,12 +279,8 @@ class Target(LabelFilter):
         - include_others (bool): Indicates whether other values should be compiled as one
             and included or discarded. Default is to discard.
         """
-        super().__init__(column, values)
-        self.include_others = include_others
-
-    def get_n_targets(self) -> int:
-        """Return the number of targets."""
-        return len(self.values) + (1 if self.include_others else 0)
+        LabelFilter.__init__(self, column=column, values=values)
+        Target.__init__(self, n_targets=len(values), include_others=include_others)
 
     def apply(self, input_df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -260,7 +301,7 @@ class Target(LabelFilter):
                 to the length of 'self.values'.
         """
         if not self.include_others:
-            input_df = super().apply(input_df)
+            input_df = LabelFilter.apply(input_df)
 
         input_df = input_df.assign(**{self.DEFAULT_TARGET_HEADER:
             input_df[self.column].map({value: index for index, value in enumerate(self.values)})})
@@ -269,14 +310,39 @@ class Target(LabelFilter):
         input_df[self.DEFAULT_TARGET_HEADER] = \
             input_df[self.DEFAULT_TARGET_HEADER].astype(int)
         return input_df
+    
+    def grouped_column(self) -> str:
+        return self.column
 
+class GenericTarget(Target):
+
+    def __init__(self,
+                 n_targets : int,
+                 function: typing.Callable[[pd.DataFrame],int],
+                 include_others: bool = False):
+        super().__init__(n_targets=n_targets, include_others=include_others)
+        self.function = function
+
+    def apply(self, input_df: pd.DataFrame) -> pd.DataFrame:
+
+        input_df[self.DEFAULT_TARGET_HEADER] = input_df.apply(self.function, axis=1)
+
+        if not self.include_others:
+            input_df[self.DEFAULT_TARGET_HEADER] = \
+                input_df[self.DEFAULT_TARGET_HEADER].fillna(self.n_targets)
+        else:
+            input_df = input_df.dropna(subset=[self.DEFAULT_TARGET_HEADER])
+
+        input_df[self.DEFAULT_TARGET_HEADER] = \
+            input_df[self.DEFAULT_TARGET_HEADER].astype(int)
+        return input_df
 
 class CustomCollection:
     """Class representing a selection of collection with targets."""
 
     def __init__(self,
                  collection: Collection,
-                 target: Target,
+                 target: LabelTarget,
                  filters: typing.Union[typing.List[Filter], Filter] = None,
                  only_sample: bool = False):
         """
@@ -318,16 +384,16 @@ class CustomCollection:
 
         df = self.to_df() if df is None else df
         if self.target.include_others:
-            df_label = df[df['Target']!=len(self.target.values)]
-            df_others = df[df['Target']==len(self.target.values)]
+            df_label = df[df['Target']!=self.target.get_n_targets()]
+            df_others = df[df['Target']==self.target.get_n_targets()]
 
-            df_label = df_label.groupby(self.target.column).size().reset_index(name='Qty')
-            new_row = pd.DataFrame({self.target.column: ['Others'], 'Qty': [df_others.shape[0]]})
+            df_label = df_label.groupby(self.target.grouped_column()).size().reset_index(name='Qty')
+            new_row = pd.DataFrame({self.target.grouped_column(): ['Others'], 'Qty': [df_others.shape[0]]})
 
             df = pd.concat([df_label, new_row])
 
         else:
-            df = df.groupby(self.target.column).size().reset_index(name='Qty')
+            df = df.groupby(self.target.grouped_column()).size().reset_index(name='Qty')
 
         return df
 

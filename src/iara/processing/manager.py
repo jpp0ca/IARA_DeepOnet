@@ -220,7 +220,7 @@ class AudioFileProcessor():
 
         for local_id, target in tqdm.tqdm(
                                 list(zip(file_ids, targets)), desc='Get data', leave=False, ncols=120):
-            data_df = self.get_data(local_id)
+            data_df, _ = self.get_data(local_id)
             result_df = pd.concat([result_df, data_df], ignore_index=True)
 
             replicated_targets = pd.Series([target] * len(data_df), name='Target')

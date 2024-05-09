@@ -64,7 +64,7 @@ def main(override: bool, folds: typing.List[int], only_sample: bool, cpa_test: i
         if not config:
             custom_collection = iara.records.CustomCollection(
                             collection = collection,
-                            target = iara.records.Target(
+                            target = iara.records.LabelTarget(
                                 column = 'TYPE',
                                 values = ['Cargo', 'Tanker', 'Tug'],
                                 include_others = True

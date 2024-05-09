@@ -53,7 +53,7 @@ def main(override: bool,
         if not config:
             custom_collection = iara.records.CustomCollection(
                             collection = collection,
-                            target = iara.records.Target(
+                            target = iara.records.LabelTarget(
                                 column = 'DETAILED TYPE',
                                 values = ['Bulk Carrier', 'Container Ship', 'General Cargo'],
                                 include_others = True

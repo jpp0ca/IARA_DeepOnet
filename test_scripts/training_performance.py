@@ -34,7 +34,7 @@ custom_collection = iara.records.CustomCollection(
                     column='TYPE',
                     values=['Cargo']
                 ),
-                target = iara.records.Target(
+                target = iara.records.LabelTarget(
                     column = 'TYPE',
                     values = ['Cargo', 'Tanker', 'Tug'],
                     include_others = True

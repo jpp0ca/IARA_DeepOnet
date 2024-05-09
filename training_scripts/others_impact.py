@@ -50,7 +50,7 @@ def main(override: bool,
         if not config:
             custom_collection = iara.records.CustomCollection(
                             collection = collection,
-                            target = iara.records.Target(
+                            target = iara.records.LabelTarget(
                                 column = 'TYPE',
                                 values = ['Cargo', 'Tanker', 'Tug'],
                                 include_others = True if config_name == 'with' else False

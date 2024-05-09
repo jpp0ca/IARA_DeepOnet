@@ -43,7 +43,7 @@ def main(override: bool, folds: typing.List[int], only_sample: bool):
         #             )
         dataset = iara.records.CustomCollection(
                         iara.records.Collection.OS_CPA_IN,
-                        iara.records.Target(
+                        iara.records.LabelTarget(
                             column = 'DETAILED TYPE',
                             values = ['Bulk Carrier', 'Container Ship'],
                             include_others = True

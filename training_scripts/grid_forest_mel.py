@@ -13,6 +13,8 @@ import itertools
 import argparse
 import tqdm
 
+import numpy as np
+
 import iara.records
 import iara.ml.experiment as iara_exp
 import iara.ml.dataset as iara_dataset
@@ -35,27 +37,66 @@ def main(override: bool,
     grid_val = iara_metrics.GridCompiler()
     grid_trn = iara_metrics.GridCompiler()
 
+
+    def get_target(row):
+        try:
+            length = float(row['Length'])
+            if length == np.nan:
+                return np.nan
+
+            if length < 15:
+                return 0
+            if length < 50:
+                return 1
+            if length < 115:
+                return 2
+
+            return 3
+
+        except ValueError:
+            return np.nan
+
     for n_mels in tqdm.tqdm([16, 32, 64, 128], leave=False, desc="N_mels", ncols=120):
 
         config_name = f'forest_mel_{n_mels}_{str(training_strategy)}'
 
         output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
 
-        dp = iara_default.default_iara_mel_audio_processor()
-        dp.normalization = iara_proc.Normalization.MIN_MAX
-        dp.n_mels = n_mels
+        dp = iara_manager.AudioFileProcessor(
+            data_base_dir = DEFAULT_DIRECTORIES.data_dir,
+            data_processed_base_dir = DEFAULT_DIRECTORIES.process_dir,
+            normalization = iara_proc.Normalization.MIN_MAX,
+            analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
+            n_pts = 1024,
+            n_overlap = 0,
+            decimation_rate = 3,
+            n_mels=n_mels,
+            integration_interval=2.048
+        )
+
+        custom_collection = iara.records.CustomCollection(
+                    collection = iara.records.Collection.OS,
+                    target = iara.records.GenericTarget(
+                        n_targets = 5,
+                        function = get_target,
+                        include_others = True
+                    ),
+                    only_sample=False
+                )
 
         config = iara_exp.Config(
                         name = config_name,
-                        dataset = iara_default.default_collection(only_sample=only_sample),
+                        dataset = custom_collection,
                         dataset_processor = dp,
                         output_base_dir = output_base_dir,
                         input_type = iara_dataset.InputType.Window(),
                         exclusive_ships_on_test=False)
 
         grid_search = {
-            'Estimators': [10, 25, 50, 75],
-            'Max depth': [5, 10, 30]
+            # 'Estimators': [10, 25, 50, 75],
+            # 'Max depth': [5, 10, 30]
+            'Estimators': [25, 50, 75],
+            'Max depth': [5, 10]
         }
 
         mlp_trainers = []

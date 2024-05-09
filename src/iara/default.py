@@ -104,7 +104,7 @@ def default_collection(only_sample: bool = False):
 
     return iara.records.CustomCollection(
             collection = iara.records.Collection.OS_SHIP,
-            target = iara.records.Target(
+            target = iara.records.LabelTarget(
                 column = 'TYPE',
                 values = ['Cargo', 'Tanker', 'Tug'],
                 include_others = True
