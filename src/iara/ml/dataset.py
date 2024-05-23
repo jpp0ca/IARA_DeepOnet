@@ -190,6 +190,12 @@ class InputType():
                     self.n_news == other.n_news)
         return False
 
+    def __str__(self) -> str:
+        if self.n_windows == 1:
+            return f'Window [{self.n_overlap}]'
+
+        return f'Image [{self.n_windows},{self.n_overlap}]'
+
     @classmethod
     def Window(cls):
         return cls(n_windows=1, overlap=0)

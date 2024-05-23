@@ -362,15 +362,15 @@ class Manager():
 
             df_trn = self.config.dataset.to_compiled_df(trn_set)
             df_val = self.config.dataset.to_compiled_df(val_set)
-            # df_test = self.config.dataset.to_compiled_df(test_set)
+            df_test = self.config.dataset.to_compiled_df(test_set)
 
             df_trn = df_trn.rename(columns={'Qty': f'Trn_{i_fold}'})
             df_val = df_val.rename(columns={'Qty': f'Val_{i_fold}'})
-            # df_test = df_test.rename(columns={'Qty': f'Test_{i_fold}'})
+            df_test = df_test.rename(columns={'Qty': f'Test_{i_fold}'})
 
             df = pd.merge(df, df_trn, on=self.config.dataset.target.grouped_column())
             df = pd.merge(df, df_val, on=self.config.dataset.target.grouped_column())
-            # df = pd.merge(df, df_test, on=self.config.dataset.target.column)
+            df = pd.merge(df, df_test, on=self.config.dataset.target.grouped_column())
 
             break
 
@@ -385,7 +385,7 @@ class Manager():
         if folds is None or len(folds) == 0:
             folds = range(len(id_list))
 
-        self.print_dataset_details(id_list)
+        # self.print_dataset_details(id_list)
 
         for _ in tqdm.tqdm(range(1), leave=False,
                            desc="--- Fitting models ---", bar_format = "{desc}"):
@@ -408,11 +408,11 @@ class Manager():
                           dataset_id='val',
                           dataset_ids=val_set['ID'].to_list())
 
-                # self.eval(i_fold=i_fold,
-                #           dataset_id='test',
-                #           dataset_ids=test_set['ID'].to_list())
+                self.eval(i_fold=i_fold,
+                          dataset_id='test',
+                          dataset_ids=test_set['ID'].to_list())
 
-        return self.compile_results(dataset_id='val',
+        return self.compile_results(dataset_id='test',
                                 trainer_list=self.trainer_list,
                                 folds=folds)
 

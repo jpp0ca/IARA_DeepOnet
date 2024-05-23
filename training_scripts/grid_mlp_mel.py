@@ -35,60 +35,21 @@ def main(override: bool,
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
 
-    grid_val = iara_metrics.GridCompiler()
-    grid_trn = iara_metrics.GridCompiler()
-
-    def get_targets(row):
-        try:
-            length = float(row['Length'])
-
-            if np.isnan(length):
-                return 4 # background
-
-            if length < 15:
-                return 0
-            if length < 50:
-                return 1
-            if length < 115:
-                return 2
-
-            return 3
-
-        except ValueError:
-            return np.nan
+    result_grid = {
+        'trn': iara_metrics.GridCompiler(),
+        'val': iara_metrics.GridCompiler(),
+        'test': iara_metrics.GridCompiler(),
+    }
 
     config_name = f'mlp_mel_{str(training_strategy)}'
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
 
-    dp = iara_manager.AudioFileProcessor(
-        data_base_dir = DEFAULT_DIRECTORIES.data_dir,
-        data_processed_base_dir = DEFAULT_DIRECTORIES.process_dir,
-        normalization = iara_proc.Normalization.MIN_MAX,
-        analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
-        n_pts = 1024,
-        n_overlap = 0,
-        decimation_rate = 3,
-        n_mels=128,
-        integration_interval=2.048
-    )
-
-    custom_collection = iara.records.CustomCollection(
-                collection = iara.records.Collection.OS,
-                target = iara.records.GenericTarget(
-                    n_targets = 5,
-                    function = get_targets,
-                    include_others = False
-                ),
-                only_sample=False
-            )
-
     config = iara_exp.Config(
                     name = config_name,
-                    dataset = custom_collection,
-                    dataset_processor = dp,
+                    dataset = iara_default.default_collection(only_sample=only_sample),
+                    dataset_processor = iara_default.default_iara_mel_audio_processor(),
                     output_base_dir = output_base_dir,
-                    input_type = iara_dataset.InputType.Window(),
-                    exclusive_ships_on_test=False)
+                    input_type = iara_default.default_window_input())
 
     grid_search = {
         'Neurons': [4, 16, 64, 256, 1024],
@@ -132,31 +93,27 @@ def main(override: bool,
 
     manager = iara_exp.Manager(config, *mlp_trainers)
 
-    result_dict = manager.run(folds = folds)
+    manager.run(folds = folds, override = override)
 
-    for trainer_id, results in result_dict.items():
+    for dataset_id, grid in result_grid.items():
 
-        for i_fold, result in enumerate(results):
+        result_dict = manager.compile_results(folds = folds,
+                                                dataset_id=dataset_id,
+                                                trainer_list=mlp_trainers)
 
-            grid_val.add(params=param_dict[trainer_id],
-                        i_fold=i_fold,
-                        target=result['Target'],
-                        prediction=result['Prediction'])
+        for trainer_id, results in result_dict.items():
 
-    result_dict = manager.compile_results(folds = folds, dataset_id='trn', trainer_list=mlp_trainers)
+            for i_fold, result in enumerate(results):
 
-    for trainer_id, results in result_dict.items():
+                grid.add(params=param_dict[trainer_id],
+                         i_fold=i_fold,
+                         target=result['Target'],
+                         prediction=result['Prediction'])
 
-        for i_fold, result in enumerate(results):
-
-            grid_trn.add(params=param_dict[trainer_id],
-                        i_fold=i_fold,
-                        target=result['Target'],
-                        prediction=result['Prediction'])
-
-    print(grid_trn)
-    print(grid_val)
-
+    for dataset_id, grid in result_grid.items():
+        print(f'########## {dataset_id} ############')
+        print('print_cm: ' , grid.print_cm())
+        print(grid)
 
 if __name__ == "__main__":
     strategy_str_list = [str(i) for i in iara_trn.ModelTrainingStrategy]

@@ -4,12 +4,8 @@ import typing
 import numpy as np
 import pandas as pd
 
-import torch
-
-import iara.ml.experiment as iara_exp
-import iara.ml.models.mlp as iara_mlp
 import iara.records
-import iara.ml.models.trainer as iara_trn
+import iara.ml.dataset as iara_dataset
 import iara.processing.analysis as iara_proc
 import iara.processing.manager as iara_manager
 
@@ -71,7 +67,7 @@ def default_iara_lofar_audio_processor(directories: Directories = DEFAULT_DIRECT
         n_pts = 1024,
         n_overlap = 0,
         decimation_rate = 3,
-        integration_interval=2.048
+        integration_interval=0.512
     )
 
 def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTORIES,
@@ -86,7 +82,7 @@ def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTOR
         n_overlap = 0,
         decimation_rate = 3,
         n_mels=n_mels,
-        integration_interval=2.048
+        integration_interval=0.512
     )
 
 def default_collection(only_sample: bool = False):
@@ -100,3 +96,9 @@ def default_collection(only_sample: bool = False):
             ),
             only_sample=only_sample
         )
+
+def default_window_input():
+    return iara_dataset.InputType.Window()
+
+def default_image_input():
+    return iara_dataset.InputType.Image(32)
