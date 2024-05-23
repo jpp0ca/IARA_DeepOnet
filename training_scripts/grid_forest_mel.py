@@ -38,11 +38,12 @@ def main(override: bool,
     grid_trn = iara_metrics.GridCompiler()
 
 
-    def get_target(row):
+    def get_targets(row):
         try:
             length = float(row['Length'])
-            if length == np.nan:
-                return np.nan
+
+            if np.isnan(length):
+                return 4 # background
 
             if length < 15:
                 return 0
@@ -78,8 +79,8 @@ def main(override: bool,
                     collection = iara.records.Collection.OS,
                     target = iara.records.GenericTarget(
                         n_targets = 5,
-                        function = get_target,
-                        include_others = True
+                        function = get_targets,
+                        include_others = False
                     ),
                     only_sample=False
                 )
@@ -93,10 +94,8 @@ def main(override: bool,
                         exclusive_ships_on_test=False)
 
         grid_search = {
-            # 'Estimators': [10, 25, 50, 75],
-            # 'Max depth': [5, 10, 30]
-            'Estimators': [25, 50, 75],
-            'Max depth': [5, 10]
+            'Estimators': [10, 25, 50, 75],
+            'Max depth': [5, 10, 30]
         }
 
         mlp_trainers = []
@@ -141,6 +140,8 @@ def main(override: bool,
                             target=result['Target'],
                             prediction=result['Prediction'])
 
+    print('grid_trn.print_cm: ' , grid_trn.print_cm())
+    print('grid_val.print_cm: ' , grid_val.print_cm())
     print(grid_trn)
     print(grid_val)
 

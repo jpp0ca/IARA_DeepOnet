@@ -322,6 +322,8 @@ class OptimizerTrainer(BaseTrainer):
         expected_targets = torch.arange(self.n_targets)
 
         if not torch.equal(unique_targets.sort()[0], expected_targets):
+            print('unique_targets: ', unique_targets)
+            print('expected_targets: ', expected_targets)
             raise UnboundLocalError(f'Targets in dataset not compatible with NNTrainer \
                                     configuration({self.n_targets})')
 
@@ -631,6 +633,7 @@ class OptimizerTrainer(BaseTrainer):
 
             df.to_csv(output_file, index=False)
             return df_result
+
 
 class RandomForestTrainer(BaseTrainer):
     """Implementation of the BaseTrainer for training a RandomForest networks."""

@@ -31,8 +31,10 @@ class Config:
                 dataset_processor: iara_manager.AudioFileProcessor,
                 input_type: iara_dataset.InputType,
                 output_base_dir: str,
-                test_ratio: float = 0.2,
-                exclusive_ships_on_test = True):
+                test_ratio: float = 0.25,
+                exclusive_ships_on_test = True,
+                exclusive_header = 'Ship ID',
+                target_header = 'Target'):
         """
         Parameters:
         - name (str): A unique identifier for the training configuration.
@@ -51,6 +53,8 @@ class Config:
         self.output_base_dir = os.path.join(output_base_dir, self.name)
         self.test_ratio = test_ratio
         self.exclusive_ships_on_test = exclusive_ships_on_test
+        self.exclusive_header = exclusive_header
+        self.target_header = target_header
 
     def get_n_folds(self) -> int:
         return 10
@@ -85,7 +89,14 @@ class Config:
         """
         df = self.dataset.to_df()
 
-        df_filtered = df.drop_duplicates(subset='Ship ID')
+        if self.exclusive_header in df.columns:
+            df_ships = df[~df[self.exclusive_header].isna()]
+            df_non_ships = df[df[self.exclusive_header].isna()]
+
+            df_filtered = df_ships.drop_duplicates(subset=self.exclusive_header)
+        else:
+            df_filtered = pd.DataFrame()
+            df_non_ships = df
 
         split_list = []
 
@@ -93,23 +104,67 @@ class Config:
 
             skf = sk_selection.StratifiedKFold(n_splits=2, shuffle=True, random_state=42)
 
-            for trn_idx, val_idx in skf.split(df_filtered, df_filtered['Target']):
-                train_ship_ids = df_filtered.iloc[trn_idx]['Ship ID']
-                test_ship_ids = df_filtered.iloc[val_idx]['Ship ID']
+            if not df_filtered.empty:
+                ship_split = skf.split(df_filtered, df_filtered[self.target_header])
+            else:
+                ship_split = [None, None]
 
-                train_data = df[df['Ship ID'].isin(train_ship_ids)]
-                test_data = df[df['Ship ID'].isin(test_ship_ids)]
+            if not df_non_ships.empty:
+                non_ship_split = skf.split(df_non_ships, df_non_ships[self.target_header])
+            else:
+                non_ship_split = [None, None]
 
-                split_list.append((train_data, test_data, []))
+            for (ship_idx, non_ship_idx) in zip(ship_split, non_ship_split):
+
+                sss = sk_selection.StratifiedShuffleSplit(n_splits=1,
+                                                        test_size=self.test_ratio,
+                                                        random_state=42)
+
+                if ship_idx is not None:
+                    train_ship_ids = df_filtered.iloc[ship_idx[0]][self.exclusive_header]
+                    val_test_ship_ids = df_filtered.iloc[ship_idx[1]]
+
+                    (test_idx, val_idx) = next(sss.split(val_test_ship_ids, val_test_ship_ids[self.target_header]))
+
+                    val_ship_ids = val_test_ship_ids.iloc[val_idx][self.exclusive_header]
+                    test_ship_ids = val_test_ship_ids.iloc[test_idx][self.exclusive_header]
+
+                    train_data = df_ships[df_ships[self.exclusive_header].isin(train_ship_ids)]
+                    val_data = df_ships[df_ships[self.exclusive_header].isin(val_ship_ids)]
+                    test_data = df_ships[df_ships[self.exclusive_header].isin(test_ship_ids)]
+
+
+                if non_ship_idx is not None:
+
+                    val_test_non_ship_ids = df_non_ships.iloc[non_ship_idx[1]]
+
+                    (test_idx, val_idx) = next(sss.split(val_test_non_ship_ids, val_test_non_ship_ids[self.target_header]))
+
+                    if ship_idx is not None:
+                        train_data = pd.concat([train_data, df_non_ships.iloc[non_ship_idx[0]]])
+                        val_data = pd.concat([val_data, val_test_non_ship_ids.iloc[val_idx]])
+                        test_data = pd.concat([test_data, val_test_non_ship_ids.iloc[test_idx]])
+                    else:
+                        train_data = df_non_ships.iloc[non_ship_idx[0]]
+                        val_data = val_test_non_ship_ids.iloc[val_idx]
+                        test_data = val_test_non_ship_ids.iloc[test_idx]
+
+                split_list.append((train_data, val_data, test_data))
 
         return split_list
 
     def get_data_loader(self) -> iara_dataset.ExperimentDataLoader:
         df = self.dataset.to_df()
+
+        if 'CPA time' in df.columns:
+            return iara_dataset.ExperimentDataLoader(self.dataset_processor,
+                                            df['ID'].to_list(),
+                                            df['Target'].to_list(),
+                                            df['CPA time'].to_list())
+
         return iara_dataset.ExperimentDataLoader(self.dataset_processor,
                                         df['ID'].to_list(),
-                                        df['Target'].to_list(),
-                                        df['CPA time'].to_list())
+                                        df['Target'].to_list())
 
     def __eq__(self, other):
         if isinstance(other, Config):
@@ -313,8 +368,8 @@ class Manager():
             df_val = df_val.rename(columns={'Qty': f'Val_{i_fold}'})
             # df_test = df_test.rename(columns={'Qty': f'Test_{i_fold}'})
 
-            df = pd.merge(df, df_trn, on=self.config.dataset.target.column)
-            df = pd.merge(df, df_val, on=self.config.dataset.target.column)
+            df = pd.merge(df, df_trn, on=self.config.dataset.target.grouped_column())
+            df = pd.merge(df, df_val, on=self.config.dataset.target.grouped_column())
             # df = pd.merge(df, df_test, on=self.config.dataset.target.column)
 
             break

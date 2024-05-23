@@ -1,3 +1,9 @@
+import enum
+import typing
+
+import numpy as np
+import pandas as pd
+
 import torch
 
 import iara.ml.experiment as iara_exp
@@ -26,13 +32,41 @@ DEFAULT_DIRECTORIES = Directories()
 DEFAULT_DEEPSHIP_DIRECTORIES = Directories(data_dir="/data/deepship",
                                            process_dir="./data/deepship_processed")
 
+class Target(enum.Enum):
+    # https://www.mdpi.com/2072-4292/11/3/353
+    VERY_SMALL = 0
+    SMALL = 1
+    MEDIUM = 2
+    LARGE = 3
+    BACKGROUND = 4
+
+    @staticmethod
+    def classify(ship_length: float) -> 'Target':
+        if np.isnan(ship_length):
+            return Target.BACKGROUND
+
+        if ship_length < 15:
+            return Target.VERY_SMALL
+        if ship_length < 50:
+            return Target.SMALL
+        if ship_length < 100:
+            return Target.MEDIUM
+
+        return Target.LARGE
+
+    @staticmethod
+    def classify_row(ship_length: pd.DataFrame) -> float:
+        try:
+            return Target.classify(float(ship_length['Length'])).value
+        except ValueError:
+            return np.nan
 
 def default_iara_lofar_audio_processor(directories: Directories = DEFAULT_DIRECTORIES):
     """Method to get default AudioFileProcessor for iara."""
     return iara_manager.AudioFileProcessor(
         data_base_dir = directories.data_dir,
         data_processed_base_dir = directories.process_dir,
-        normalization = iara_proc.Normalization.NORM_L2,
+        normalization = iara_proc.Normalization.MIN_MAX,
         analysis = iara_proc.SpectralAnalysis.LOFAR,
         n_pts = 1024,
         n_overlap = 0,
@@ -40,79 +74,29 @@ def default_iara_lofar_audio_processor(directories: Directories = DEFAULT_DIRECT
         integration_interval=2.048
     )
 
-def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTORIES):
+def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTORIES,
+                                     n_mels: int = 32):
     """Method to get default AudioFileProcessor for iara."""
     return iara_manager.AudioFileProcessor(
         data_base_dir = directories.data_dir,
         data_processed_base_dir = directories.process_dir,
-        normalization = iara_proc.Normalization.NORM_L2,
+        normalization = iara_proc.Normalization.MIN_MAX,
         analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
         n_pts = 1024,
         n_overlap = 0,
         decimation_rate = 3,
-        n_mels=32,
+        n_mels=n_mels,
         integration_interval=2.048
     )
 
-def default_deepship_audio_processor(directories: Directories = DEFAULT_DEEPSHIP_DIRECTORIES):
-    """Method to get default AudioFileProcessor for deepship."""
-    return iara_manager.AudioFileProcessor(
-        data_base_dir = directories.data_dir,
-        data_processed_base_dir = directories.process_dir,
-        normalization = iara_proc.Normalization.NORM_L2,
-        analysis = iara_proc.SpectralAnalysis.LOFAR,
-        n_pts = 1024,
-        n_overlap = 0,
-        decimation_rate = 2,
-    )
-
-def default_trainers(config: iara_exp.Config):
-    """Get trainers for all the best models in the grid search configuration
-
-    Args:
-        config (iara_exp.Config): Training configuration
-    """
-
-    trainers = []
-
-    for training_type in iara_trn.ModelTrainingStrategy:
-        trainers.append(iara_trn.OptimizerTrainer(
-                training_strategy=training_type,
-                trainer_id = f'mlp_{str(training_type)}',
-                n_targets = config.dataset.target.get_n_targets(),
-                model_allocator=lambda input_shape, n_targets:
-                        iara_mlp.MLP(input_shape=input_shape,
-                            n_neurons=256,
-                            n_targets=n_targets,
-                            activation_hidden_layer=torch.nn.PReLU()),
-                optimizer_allocator=lambda model:
-                    torch.optim.Adam(model.parameters(), lr=5e-5),
-                batch_size = 128,
-                n_epochs = 512,
-                patience=32))
-
-    for training_type in iara_trn.ModelTrainingStrategy:
-        trainers.append(iara_trn.RandomForestTrainer(
-                                    training_strategy=training_type,
-                                    trainer_id = f'forest_{str(training_type)}',
-                                    n_targets = config.dataset.target.get_n_targets(),
-                                    n_estimators = 100))
-
-    return trainers
-
 def default_collection(only_sample: bool = False):
-
+    """Method to get default collection for iara."""
     return iara.records.CustomCollection(
-            collection = iara.records.Collection.OS_SHIP,
-            target = iara.records.LabelTarget(
-                column = 'TYPE',
-                values = ['Cargo', 'Tanker', 'Tug'],
-                include_others = True
+            collection = iara.records.Collection.OS,
+            target = iara.records.GenericTarget(
+                n_targets = 5,
+                function = Target.classify_row,
+                include_others = False
             ),
-            # target = iara.records.Target(
-            #     column = 'DETAILED TYPE',
-            #     values = ['Pilot Vessel', 'Motor Hopper'],
-            #     include_others = False
-            # ),
             only_sample=only_sample
         )

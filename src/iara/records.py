@@ -244,6 +244,12 @@ class LabelFilter():
                         present in the specified column.
         """
         return input_df.loc[input_df[self.column].isin(self.values)]
+    
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, LabelFilter):
+            return (self.column == other.column and
+                    self.values == other.values)
+        return False
 
 class Target(Filter):
     DEFAULT_TARGET_HEADER = 'Target'
@@ -310,9 +316,16 @@ class LabelTarget(LabelFilter, Target):
         input_df[self.DEFAULT_TARGET_HEADER] = \
             input_df[self.DEFAULT_TARGET_HEADER].astype(int)
         return input_df
-    
+
     def grouped_column(self) -> str:
         return self.column
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Target):
+            return (self.column == other.column and
+                    self.values == other.values and
+                    self.include_others == other.include_others)
+        return False
 
 class GenericTarget(Target):
 
@@ -337,12 +350,18 @@ class GenericTarget(Target):
             input_df[self.DEFAULT_TARGET_HEADER].astype(int)
         return input_df
 
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, GenericTarget):
+            return (self.n_targets == other.n_targets and
+                    self.include_others == other.include_others)
+        return False
+
 class CustomCollection:
     """Class representing a selection of collection with targets."""
 
     def __init__(self,
                  collection: Collection,
-                 target: LabelTarget,
+                 target: Target,
                  filters: typing.Union[typing.List[Filter], Filter] = None,
                  only_sample: bool = False):
         """
@@ -399,5 +418,8 @@ class CustomCollection:
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, CustomCollection):
-            return self.to_df().equals(other.to_df())
+            return (self.collection == other.collection and
+                    self.target == other.target and
+                    self.filters == other.filters and
+                    self.only_sample == other.only_sample)
         return False

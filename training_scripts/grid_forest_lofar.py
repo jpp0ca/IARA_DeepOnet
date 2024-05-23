@@ -11,12 +11,15 @@ The chosen configuration will then be used for further training and analysis in 
 import typing
 import itertools
 import argparse
+import numpy as np
 
 import iara.records
 import iara.ml.experiment as iara_exp
 import iara.ml.dataset as iara_dataset
 import iara.ml.models.trainer as iara_trn
 import iara.ml.metrics as iara_metrics
+import iara.processing.analysis as iara_proc
+import iara.processing.manager as iara_manager
 
 import iara.default as iara_default
 from iara.default import DEFAULT_DIRECTORIES
@@ -35,16 +38,58 @@ def main(override: bool,
     config_name = f'forest_lofar_{str(training_strategy)}'
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
 
+    def get_targets(row):
+        try:
+            length = float(row['Length'])
+
+            if np.isnan(length):
+                return 4 # background
+
+            if length < 15:
+                return 0
+            if length < 50:
+                return 1
+            if length < 115:
+                return 2
+
+            return 3
+
+        except ValueError:
+            return np.nan
+
+
+    dp = iara_manager.AudioFileProcessor(
+        data_base_dir = DEFAULT_DIRECTORIES.data_dir,
+        data_processed_base_dir = DEFAULT_DIRECTORIES.process_dir,
+        normalization = iara_proc.Normalization.MIN_MAX,
+        analysis = iara_proc.SpectralAnalysis.LOFAR,
+        n_pts = 1024,
+        n_overlap = 0,
+        decimation_rate = 3,
+        integration_interval=2.048
+    )
+
+    custom_collection = iara.records.CustomCollection(
+                collection = iara.records.Collection.OS,
+                target = iara.records.GenericTarget(
+                    n_targets = 5,
+                    function = get_targets,
+                    include_others = True
+                ),
+                only_sample=False
+            )
+
     config = iara_exp.Config(
                     name = config_name,
-                    dataset = iara_default.default_collection(only_sample=only_sample),
-                    dataset_processor = iara_default.default_iara_lofar_audio_processor(),
+                    dataset = custom_collection,
+                    dataset_processor = dp,
                     output_base_dir = output_base_dir,
-                        input_type = iara_dataset.InputType.Window())
+                    input_type = iara_dataset.InputType.Window(),
+                    exclusive_ships_on_test=False)
 
     grid_search = {
-        'Estimators': [10, 20, 30, 40, 50],
-        'Max depth': [5, 10, 15, 20, 25, 30]
+        'Estimators': [25, 50, 75],
+        'Max depth': [5, 10, 30]
     }
 
     mlp_trainers = []
@@ -88,6 +133,8 @@ def main(override: bool,
                         target=result['Target'],
                         prediction=result['Prediction'])
 
+    print('grid_trn.print_cm: ' , grid_trn.print_cm())
+    print('grid_val.print_cm: ' , grid_val.print_cm())
     print(grid_trn)
     print(grid_val)
 

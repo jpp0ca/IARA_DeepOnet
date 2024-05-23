@@ -11,18 +11,16 @@ The chosen configuration will then be used for further training and analysis in 
 import typing
 import itertools
 import argparse
-import numpy as np
 
 import torch
 
 import iara.records
 import iara.ml.models.mlp as iara_mlp
+import iara.ml.models.cnn as iara_cnn
 import iara.ml.experiment as iara_exp
 import iara.ml.dataset as iara_dataset
 import iara.ml.models.trainer as iara_trn
 import iara.ml.metrics as iara_metrics
-import iara.processing.analysis as iara_proc
-import iara.processing.manager as iara_manager
 
 import iara.default as iara_default
 from iara.default import DEFAULT_DIRECTORIES
@@ -38,68 +36,39 @@ def main(override: bool,
     grid_val = iara_metrics.GridCompiler()
     grid_trn = iara_metrics.GridCompiler()
 
-    config_name = f'mlp_lofar_{str(training_strategy)}'
+    config_name = f'cnn_mel_{str(training_strategy)}'
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
-
-    def get_targets(row):
-        try:
-            length = float(row['Length'])
-
-            if np.isnan(length):
-                return 4 # background
-
-            if length < 15:
-                return 0
-            if length < 50:
-                return 1
-            if length < 115:
-                return 2
-
-            return 3
-
-        except ValueError:
-            return np.nan
-
-    dp = iara_manager.AudioFileProcessor(
-        data_base_dir = DEFAULT_DIRECTORIES.data_dir,
-        data_processed_base_dir = DEFAULT_DIRECTORIES.process_dir,
-        normalization = iara_proc.Normalization.MIN_MAX,
-        analysis = iara_proc.SpectralAnalysis.LOFAR,
-        n_pts = 1024,
-        n_overlap = 0,
-        decimation_rate = 3,
-        integration_interval=2.048
-    )
-
-    custom_collection = iara.records.CustomCollection(
-                collection = iara.records.Collection.OS,
-                target = iara.records.GenericTarget(
-                    n_targets = 5,
-                    function = get_targets,
-                    include_others = False
-                ),
-                only_sample=False
-            )
 
     config = iara_exp.Config(
                     name = config_name,
-                    dataset = custom_collection,
-                    dataset_processor = dp,
+                    dataset = iara_default.default_collection(only_sample=only_sample),
+                    dataset_processor = iara_default.default_iara_mel_audio_processor(),
                     output_base_dir = output_base_dir,
-                    input_type = iara_dataset.InputType.Window(),
-                    exclusive_ships_on_test=False)
+                    input_type = iara_dataset.InputType.Image(n_windows=16, overlap=0.5))
 
     grid_search = {
-        'Neurons': [4, 16, 64, 256, 1024],
-        'Activation': ['Tanh', 'ReLU', 'PReLU'],
-        'Weight decay': [0, 1e-3, 1e-5]
+        'conv_n_neurons': [
+                    [16, 32],
+                    [32, 64],
+                    [16, 32, 64]
+                ],
+        'classification_n_neurons': [16, 128, 1024],
+        'Activation': ['ReLU', 'PReLU', 'LeakyReLU'],
+        'Weight decay': [0, 1e-3, 1e-5],
+        'conv_pooling': ['Max', 'Avg'],
+        'kernel': [3, 5],
     }
-
 
     activation_dict = {
             'Tanh': torch.nn.Tanh(),
             'ReLU': torch.nn.ReLU(),
-            'PReLU': torch.nn.PReLU()
+            'PReLU': torch.nn.PReLU(),
+            'LeakyReLU': torch.nn.LeakyReLU()
+    }
+
+    pooling_dict = {
+            'Max': torch.nn.MaxPool2d(2, 2),
+            'Avg': torch.nn.AvgPool2d(2, 2)
     }
 
     mlp_trainers = []
@@ -110,7 +79,9 @@ def main(override: bool,
         param_pack = dict(zip(grid_search.keys(), combination))
         weight_str = f"{param_pack['Weight decay']:.0e}" if param_pack['Weight decay'] != 0 else '0'
 
-        trainer_id = f"mlp_{param_pack['Neurons']}_{param_pack['Activation']}_{weight_str}"
+        trainer_id = f"cnn_{param_pack['conv_n_neurons']}_\
+                {param_pack['classification_n_neurons']}_{param_pack['Activation']}_\
+                {weight_str}_{param_pack['conv_pooling']}"
 
         param_dict[trainer_id] = param_pack
 
@@ -119,15 +90,23 @@ def main(override: bool,
                 trainer_id = trainer_id,
                 n_targets = config.dataset.target.get_n_targets(),
                 model_allocator=lambda input_shape, n_targets,
-                    n_neurons=param_pack['Neurons'],
-                    activation=activation_dict[param_pack['Activation']]:
-                        iara_mlp.MLP(input_shape=input_shape,
-                            n_neurons=n_neurons,
-                            n_targets=n_targets,
-                            activation_hidden_layer=activation),
+                    conv_neurons=param_pack['conv_n_neurons'],
+                    class_neurons=param_pack['classification_n_neurons'],
+                    activation=activation_dict[param_pack['Activation']],
+                    pooling=pooling_dict[param_pack['conv_pooling']],
+                    kernel=param_pack['kernel']:
+                        iara_cnn.CNN(
+                            input_shape=input_shape,
+                            conv_activation = activation,
+                            conv_n_neurons=conv_neurons,
+                            conv_pooling=pooling,
+                            kernel_size=kernel,
+                            classification_n_neurons=class_neurons,
+                            n_targets=n_targets),
                 optimizer_allocator=lambda model, weight_decay=param_pack['Weight decay']:
                     torch.optim.Adam(model.parameters(),
-                                        weight_decay=weight_decay)))
+                                        weight_decay=weight_decay),
+                batch_size = 512))
 
     manager = iara_exp.Manager(config, *mlp_trainers)
 

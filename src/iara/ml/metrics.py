@@ -9,6 +9,8 @@ import typing
 import math
 
 import numpy as np
+import pandas as pd
+
 import sklearn.metrics as sk_metrics
 import scipy.stats as scipy
 
@@ -97,6 +99,45 @@ class Metric(enum.Enum):
         for metric in metric_list:
             dict_values[metric] = metric.compute(target, prediction)
         return dict_values
+
+
+class Test(enum.Enum):
+    F_TEST_5x2 = 0
+    STD_OVERLAY = 1
+
+    @staticmethod
+    def std_overlay(sample1: np.ndarray, sample2: np.ndarray, confidence_level: float) -> bool:
+        mean1 = np.mean(sample1)
+        std1 = np.std(sample1)
+        mean2 = np.mean(sample2)
+        std2 = np.std(sample2)
+        return np.abs(mean1 - mean2) > (std1 + std2)
+
+    @staticmethod
+    def f_test_5x2(sample1: np.ndarray, sample2: np.ndarray, confidence_level: float) -> bool:
+        #http://rasbt.github.io/mlxtend/user_guide/evaluate/combined_ftest_5x2cv/
+        #https://www.cmpe.boun.edu.tr/~ethem/files/papers/NC110804.PDF
+        if len(sample1) != 10 or len(sample2) != 10:
+            raise UnboundLocalError('For Ftest_5x2 must be calculated 10 values')
+
+        p_1_a = sample1[0::2]
+        p_2_a = sample1[1::2]
+
+        p_1_b = sample2[0::2]
+        p_2_b = sample2[1::2]
+
+        p_1 = p_1_a - p_1_b
+        p_2 = p_2_a - p_2_b
+
+        p_mean = (p_1 + p_2)/2
+        s_2 = (p_1 - p_mean)**2 + (p_2 - p_mean)**2
+
+        f = (np.sum(sample1**2) + np.sum(sample2**2)) / (2*np.sum(s_2))
+
+        return f > f.ppf(confidence_level, 10, 5)
+
+    def reject_equal_hipoteses(self, sample1: typing.Iterable, sample2: typing.Iterable, confidence_level = 0.95) -> bool: #return true se diferente
+        return getattr(self.__class__, self.name.lower())(sample1, sample2, confidence_level)
 
 
 class CrossValidationCompiler():
@@ -278,18 +319,15 @@ class GridCompiler():
                            Metric.SP_INDEX,
                            Metric.ACCURACY,
                            Metric.DETECTION_PROBABILITY]
-    default_fig_size = (10, 7)
 
-    def __init__(self, metric_list: typing.List['Metric'] = default_metric_list):
-        """
-        Args:
-            metric_list (List[Metric], optional): List of metrics to compute.
-                Defaults to all Metrics available.
-        """
+    def __init__(self,
+                 metric_list: typing.List['Metric'] = default_metric_list,
+                 comparison_test: Test = None):
         self.cv_dict = {}
         self.param_dict = {}
         self.params = None
         self.metric_list = metric_list
+        self.comparison_test = comparison_test
 
     def add(self,
             params: typing.Dict,
@@ -371,16 +409,19 @@ class GridCompiler():
             self.as_table(tex_format=tex_format)
         )
 
+    def print_cm(self):
+        ret = '------- Confusion Matrix -------------\n'
+
+        for hash, dict in self.cv_dict.items():
+            ret += f'-- {dict["params"]} --\n\n'
+            ret += dict['cv'].print_abs_cm()
+            ret += '\n'
+            ret += dict['cv'].print_rel_cm()
+            ret += '\n'
+        return ret
+
     def __str__(self) -> str:
 
-        # ret = '------- Confusion Matrix -------------\n'
-
-        # for hash, dict in self.cv_dict.items():
-        #     ret += f'-- {dict["params"]} --\n\n'
-        #     ret += dict['cv'].print_abs_cm()
-        #     ret += '\n'
-        #     ret += dict['cv'].print_rel_cm()
-        #     ret += '\n'
         
         ret = '------- Metric Table -------------\n'
         ret += self.as_str()
