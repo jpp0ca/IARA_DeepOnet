@@ -94,7 +94,6 @@ class Collection(enum.Enum):
 
     E = 7
     OS_BG = 7
-
     OS = 8
 
     F = 9
@@ -103,58 +102,47 @@ class Collection(enum.Enum):
     GLIDER_CPA_OUT = 10
     GLIDER_SHIP = 11
 
+    H = 12
+    GLIDER_BG = 12
+    GLIDER = 13
+
+    COMPLETE = 14
+
     def __str__(self) -> str:
         """Return a string representation of the collection."""
-
-        if self == Collection.OS_CPA_IN:
-            return 'with CPA'
-
-        if self == Collection.OS_CPA_OUT:
-            return 'without CPA'
-
-        if self == Collection.OS_SHIP:
-            return 'Total'
-
-        if self == Collection.OS:
-            return 'OS'
-
         return str(self.name).rsplit(".", maxsplit=1)[-1]
 
     def _get_info_filename(self, only_sample: bool = False) -> str:
         """Return the internal filename for collection information."""
-        if self.value <= Collection.OS_SHIP.value:
-            return os.path.join(os.path.dirname(__file__), "dataset_info",
-                                "os_ship.csv" if not only_sample else "os_ship_sample.csv")
-
-        if self.value == Collection.E.value:
-            return os.path.join(os.path.dirname(__file__), "dataset_info",
-                                "os_bg.csv" if not only_sample else "os_bg_sample.csv")
-
-        if self.value <= Collection.GLIDER_SHIP.value:
-            return os.path.join(os.path.dirname(__file__), "dataset_info",
-                                "glider_ship.csv" if not only_sample else "glider_ship.csv")
-
-        raise UnboundLocalError('info filename not specified')
+        return os.path.join(os.path.dirname(__file__),
+                            "dataset_info",
+                            "iara.csv" if not only_sample else "iara_sample.csv")
 
     def get_selection_str(self) -> str:
         """Get string to filter the 'Dataset' column."""
         if self == Collection.OS_CPA_IN:
-            return Collection.A.get_selection_str() + "|" + Collection.C.get_selection_str()
+            return Collection.A.get_selection_str() + \
+                "|" + Collection.C.get_selection_str()
 
         if self == Collection.OS_CPA_OUT:
-            return Collection.B.get_selection_str() + "|" + Collection.D.get_selection_str()
+            return Collection.B.get_selection_str() + \
+                 "|" + Collection.D.get_selection_str()
 
         if self == Collection.OS_SHIP:
-            return Collection.A.get_selection_str() + "|" + Collection.B.get_selection_str() + \
-                "|" + Collection.C.get_selection_str() + "|" + Collection.D.get_selection_str()
+            return Collection.OS_CPA_IN.get_selection_str() + \
+                "|" + Collection.OS_CPA_OUT.get_selection_str()
 
         if self == Collection.OS:
-            return Collection.A.get_selection_str() + "|" + Collection.B.get_selection_str() + \
-                "|" + Collection.C.get_selection_str() + "|" + Collection.D.get_selection_str()+ \
-                "|" + Collection.E.get_selection_str() 
+            return Collection.OS_SHIP.get_selection_str()+ \
+                "|" + Collection.OS_BG.get_selection_str()
 
         if self == Collection.GLIDER_SHIP:
-            return Collection.F.get_selection_str() + "|" + Collection.G.get_selection_str()
+            return Collection.F.get_selection_str() + \
+                "|" + Collection.G.get_selection_str()
+
+        if self == Collection.GLIDER:
+            return Collection.GLIDER_SHIP.get_selection_str() + \
+                "|" + Collection.GLIDER_BG.get_selection_str()
 
         return str(self.name).rsplit(".", maxsplit=1)[-1]
 
@@ -187,21 +175,6 @@ class Collection(enum.Enum):
         Returns:
             pd.DataFrame: A DataFrame containing detailed information about the collection.
         """
-        if self == Collection.OS:
-            df_ship = Collection.OS_SHIP.to_df(only_sample=only_sample)
-            df_bg = Collection.OS_BG.to_df(only_sample=only_sample)
-            # print(df_bg)
-            # print(df_ship)
-            # for column in ['ID', 'Dataset', 'Rain', 'Temperature', 'Wind', 'Sea state', 'Rain state']:
-            # for column in ['Rain', 'Temperature', 'Wind']:
-            #     print('column: ', column)
-            #     # print(df_ship[column].apply(type).value_counts())
-            #     # print(df_bg[column].apply(type).value_counts())
-            #     invalid = df_ship[column][~df_ship[column].str.match(r'^-?\d+(\.\d+)?$')]
-            #     print(invalid)
-
-            df = pd.merge(df_ship, df_bg, how='outer')
-            return df
         df = pd.read_csv(self._get_info_filename(only_sample=only_sample), na_values=[" - "])
         return df.loc[df['Dataset'].str.contains(self.get_selection_str())]
 
