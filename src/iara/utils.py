@@ -89,3 +89,14 @@ def str_format_bytes(n_bytes: int) -> str:
     unity = ['B', 'KB', 'MB', 'GB', 'TB']
     cont = int(math.log(n_bytes, 1024))
     return f'{n_bytes / (1024 ** cont)} {unity[cont]}'
+
+def str_format_time(n_seconds: float) -> str:
+    if n_seconds < 60:
+        return f"{n_seconds:.2f} seconds"
+
+    if n_seconds < 3600:
+        minutes = n_seconds / 60
+        return f"{minutes:.2f} minutes"
+
+    hours = n_seconds / 3600
+    return f"{hours:.2f} hours"

@@ -169,6 +169,15 @@ class BaseDataset(torch_data.Dataset):
     def get_samples(self) -> torch.tensor:
         """ Get all sample as tensors """
 
+    @abc.abstractmethod
+    def get_file_samples(self, file_id: int) \
+        -> typing.Tuple[torch.tensor, torch.tensor]:
+        """ """
+
+    @abc.abstractmethod
+    def get_file_ids(self) -> typing.Iterable[int]:
+        """ """
+
 class InputType():
     def __init__(self,
                 n_windows: int = 1,
@@ -269,3 +278,22 @@ class AudioDataset(BaseDataset):
                 self.sample_tensor = torch.cat([self.sample_tensor, self.loader.get_all(file_id)])
 
         return self.sample_tensor
+
+    @overrides.override
+    def get_file_samples(self, file_id: int) \
+        -> typing.Tuple[torch.tensor, torch.tensor]:
+
+        samples = []
+
+        base_file_index = self.file_ids.index(file_id)
+
+        for index in range(self.input_type.to_n_samples(
+                    self.limit_ids[base_file_index+1] - self.limit_ids[base_file_index])):
+            sample, target = self[index + self.limit_ids[base_file_index]]
+            samples.append(sample)
+
+        return torch.stack(samples), target
+
+    @overrides.override
+    def get_file_ids(self) -> typing.Iterable[int]:
+        return self.file_ids

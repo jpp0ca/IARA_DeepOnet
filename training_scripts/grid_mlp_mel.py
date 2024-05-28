@@ -11,6 +11,7 @@ The chosen configuration will then be used for further training and analysis in 
 import typing
 import itertools
 import argparse
+import time
 import numpy as np
 
 import torch
@@ -33,13 +34,11 @@ def main(override: bool,
         training_strategy: iara_trn.ModelTrainingStrategy):
     """Grid search main function"""
 
-    grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
+    grid_str = 'grid_search_5' if not only_sample else 'grid_search_sample'
 
-    result_grid = {
-        'trn': iara_metrics.GridCompiler(),
-        'val': iara_metrics.GridCompiler(),
-        'test': iara_metrics.GridCompiler(),
-    }
+    result_grid = {}
+    for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
+        result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
 
     config_name = f'mlp_mel_{str(training_strategy)}'
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
@@ -51,18 +50,24 @@ def main(override: bool,
                     output_base_dir = output_base_dir,
                     input_type = iara_default.default_window_input())
 
-    grid_search = {
-        'Neurons': [4, 16, 64, 256, 1024],
-        'Activation': ['Tanh', 'ReLU', 'PReLU'],
-        'Weight decay': [0, 1e-3, 1e-5]
-    }
+    # grid_search = {
+    #     'Neurons': [4, 16, 64, 256, 1024],
+    #     'Activation': ['Tanh', 'ReLU', 'PReLU'],
+    #     'Weight decay': [0, 1e-3, 1e-5]
+    # }
 
+    grid_search = {
+        'Neurons': [64],
+        'Activation': ['ReLU'],
+        'Weight decay': [1e-3]
+    }
 
     activation_dict = {
             'Tanh': torch.nn.Tanh(),
             'ReLU': torch.nn.ReLU(),
             'PReLU': torch.nn.PReLU()
     }
+
 
     mlp_trainers = []
     param_dict = {}
@@ -95,24 +100,22 @@ def main(override: bool,
 
     manager.run(folds = folds, override = override)
 
-    for dataset_id, grid in result_grid.items():
+    result_dict = manager.run(folds = folds, override = override)
 
-        result_dict = manager.compile_results(folds = folds,
-                                                dataset_id=dataset_id,
-                                                trainer_list=mlp_trainers)
+    for (eval_subset, eval_strategy), grid in result_grid.items():
 
-        for trainer_id, results in result_dict.items():
+        for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
 
             for i_fold, result in enumerate(results):
 
                 grid.add(params=param_dict[trainer_id],
-                         i_fold=i_fold,
-                         target=result['Target'],
-                         prediction=result['Prediction'])
+                            i_fold=i_fold,
+                            target=result['Target'],
+                            prediction=result['Prediction'])
 
     for dataset_id, grid in result_grid.items():
         print(f'########## {dataset_id} ############')
-        print('print_cm: ' , grid.print_cm())
+        # print('print_cm: ' , grid.print_cm())
         print(grid)
 
 if __name__ == "__main__":
@@ -129,6 +132,8 @@ if __name__ == "__main__":
                         help='Specify folds to be executed. Example: 0,4-7')
 
     args = parser.parse_args()
+
+    start_time = time.time()
 
     folds_to_execute = []
     if args.fold:
@@ -154,3 +159,7 @@ if __name__ == "__main__":
                 folds = folds_to_execute,
                 only_sample = args.only_sample,
                 training_strategy = strategy)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Elapsed time: {iara.utils.str_format_time(elapsed_time)}")

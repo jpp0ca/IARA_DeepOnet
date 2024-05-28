@@ -114,18 +114,6 @@ def main(override: bool, unbalanced: bool, training_type: Types):
                     n_epochs=32,
                     patience=5))
 
-        # trainer_list.append(iara_trn.OptimizerTrainer(
-        #             training_strategy=iara_trn.ModelTrainingStrategy.CLASS_SPECIALIST,
-        #             trainer_id='MLP',
-        #             n_targets=10,
-        #             model_allocator=lambda input_shape, n_targets:
-        #                     iara_mlp.MLP(
-        #                             input_shape=input_shape,
-        #                             n_neurons=32),
-        #             batch_size=64,
-        #             n_epochs=32,
-        #             patience=5))
-
     elif training_type == Types.RANDOM_FOREST:
 
         trainer_list.append(iara_trn.RandomForestTrainer(

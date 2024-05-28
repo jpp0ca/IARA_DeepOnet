@@ -7,6 +7,7 @@ import os
 import enum
 import typing
 import abc
+import collections
 import pickle
 
 import tqdm
@@ -76,6 +77,23 @@ class ModelTrainingStrategy(enum.Enum):
             return "multiclass"
 
         raise NotImplementedError('TrainingStrategy has not default_loss implemented')
+
+    def __str__(self) -> str:
+        return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
+
+class Subset(enum.Enum):
+    TRN = 0
+    TRAIN = 0
+    VAL = 1
+    VALIDATION = 1
+    TEST = 2
+
+    def __str__(self) -> str:
+        return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
+
+class EvalStrategy(enum.Enum):
+    BY_WINDOW = 0
+    BY_AUDIO = 1
 
     def __str__(self) -> str:
         return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
@@ -184,9 +202,59 @@ class BaseTrainer():
         raise NotImplementedError(f'TrainingStrategy has not is_trained implemented for \
                                   {self.training_strategy}')
 
+    def predict(self,
+                model: typing.Union[iara_model.BaseModel, typing.List[iara_model.BaseModel]],
+                samples: torch.Tensor) -> torch.Tensor:
+
+        if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
+            predictions = model(samples)
+
+        # elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
+            # predictions = torch.zeros((len(samples), len(model)))
+            # for m_idx, m in enumerate(model):
+            #     predictions[:, m_idx] = m(samples)
+
+            # predictions = predictions.argmax(dim=1)
+
+        else:
+            raise NotImplementedError(f'TrainingStrategy has not predict implemented for \
+                                    {self.training_strategy}')
+
+        return predictions
+
+    def load(self, model_base_dir: str) -> iara_model.BaseModel:
+
+        if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
+            filename = self.output_filename(model_base_dir=model_base_dir)
+            if not os.path.exists(filename):
+                raise FileNotFoundError(f"The model file '{filename}' does not exist. Ensure \
+                                        that the model is trained before evaluating.")
+
+            model = iara_model.BaseModel.load(filename)
+
+        # elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
+        #     models = []
+        #     for target_id in range(self.n_targets):
+        #         filename = self.output_filename(model_base_dir=model_base_dir,
+        #                                         target_id=target_id)
+        #         if not os.path.exists(filename):
+        #             raise FileNotFoundError(f"The model file '{filename}' does not exist. \
+        #                                     Ensure that the model is trained before \
+        #                                     evaluating.")
+
+        #         model = iara_model.BaseModel.load(filename)
+        #         models.append(model)
+
+        else:
+            raise NotImplementedError(f'TrainingStrategy has not load implemented for \
+                                    {self.training_strategy}')
+        
+        return model
+
     @abc.abstractmethod
     def eval(self,
-            dataset_id: str,
+            eval_subset: Subset,
+            eval_strategy: EvalStrategy,
             eval_base_dir: str,
             model_base_dir: typing.Optional[str] = None,
             dataset: iara_dataset.BaseDataset = None) -> pd.DataFrame:
@@ -206,8 +274,79 @@ class BaseTrainer():
         Returns:
             pandas.DataFrame: DataFrame with two columns, ["Target", "Prediction"]
         """
+        with torch.no_grad():
 
-    def is_evaluated(self, dataset_id: str, eval_base_dir: str) -> bool:
+            output_file = self.output_filename(model_base_dir=eval_base_dir,
+                                        complement=str(eval_subset),
+                                        extention='csv')
+
+            if os.path.exists(output_file):
+                df = pd.read_csv(output_file)
+
+                if eval_strategy == EvalStrategy.BY_AUDIO:
+
+                    def most_common_value(series):
+                        return collections.Counter(series).most_common(1)[0][0]
+
+                    df = df.groupby('File').agg({
+                        'Target': most_common_value,
+                        'Prediction': most_common_value
+                    }).reset_index()
+
+                elif eval_strategy == EvalStrategy.BY_WINDOW:
+                    pass
+
+                else:
+                    raise NotImplementedError(f'EvalStrategy has not is_trained implemented for \
+                                            {eval_strategy}')
+
+                df = df[['Target', 'Prediction']]
+                return df
+
+            os.makedirs(eval_base_dir, exist_ok=True)
+
+            model = self.load(model_base_dir=model_base_dir)
+
+            file_ids = []
+            all_targets = []
+            all_predictions = []
+
+            for file_id in dataset.get_file_ids():
+                samples, target = dataset.get_file_samples(file_id=file_id)
+
+                predictions = self.predict(model=model, samples=samples)
+
+                file_ids.extend([file_id] * len(samples))
+                all_targets.extend([int(target)] * len(samples))
+                all_predictions.extend(predictions.tolist())
+
+            all_predictions = np.array(all_predictions)
+
+            if len(all_predictions.shape) != 1:
+                df = pd.DataFrame({"File": file_ids, "Target": all_targets})
+                for idx in range(all_predictions.shape[1]):
+                    df[f"Prediction_{idx}"] = all_predictions[:, idx]
+
+                if 'Prediction' not in df.columns:
+                    prediction_cols = [col for col in df.columns if col.startswith('Prediction_')]
+                    df['Prediction'] = np.argmax(df[prediction_cols].values, axis=1)
+
+            else:
+                all_predictions = np.array([int(pred) for pred in all_predictions])
+                df = pd.DataFrame({"File": file_ids,
+                                   "Target": all_targets,
+                                   "Prediction": all_predictions})
+
+            df.to_csv(output_file, index=False)
+            return self.eval(eval_subset = eval_subset,
+                             eval_strategy = eval_strategy,
+                             eval_base_dir = eval_base_dir,
+                             model_base_dir = model_base_dir,
+                             dataset = dataset)
+
+    def is_evaluated(self,
+            eval_subset: Subset,
+            eval_base_dir: str) -> bool:
         """
         Check if all models are evaluated for the specified dataset_id in the specified directory.
 
@@ -220,7 +359,7 @@ class BaseTrainer():
                 False otherwise.
         """
         output_file = self.output_filename(model_base_dir=eval_base_dir,
-                                        complement=dataset_id,
+                                        complement=str(eval_subset),
                                         extention='csv')
 
         return os.path.exists(output_file)
@@ -531,109 +670,131 @@ class OptimizerTrainer(BaseTrainer):
         if os.path.exists(partial_trn_model):
             os.remove(partial_trn_model)
 
-    def eval(self,
-            dataset_id: str,
-            eval_base_dir: str,
-            model_base_dir: typing.Optional[str] = None,
-            dataset: typing.Optional[iara_dataset.BaseDataset] = None) -> pd.DataFrame:
-        """
-        Implementation of BaseTrainer.eval method, to eval the model using the
-            provided dataset.
+    def predict(self,
+                model: typing.Union[iara_model.BaseModel, typing.List[iara_model.BaseModel]],
+                samples: torch.Tensor) -> torch.Tensor:
 
-        Args:
-            dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
-            eval_base_dir (str): The base directory to save any evaluation-related outputs
-                or artifacts.
-            model_base_dir typing.Optional(str): The base directory to save read trained models
-                with non set the evaluation must already be done.
-            dataset typing.Optional(iara_dataset.BaseDataset): The dataset to evaluate with non set
-                the evaluation must already be done.
+        if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
+            model.eval()
+            model = model.to(self.device)
+            samples = samples.to(self.device)
+            predictions = model(samples)
+            predictions = predictions.cpu()
 
-        Returns:
-            pandas.DataFrame: DataFrame with two columns, ["Target", "Prediction"]
-        """
-        with torch.no_grad():
+        # elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
+            # predictions = torch.zeros((len(samples), len(model)))
+            # for m_idx, m in enumerate(model):
+            #     predictions[:, m_idx] = m(samples)
 
-            all_predictions = []
-            all_targets = []
+            # predictions = predictions.argmax(dim=1)
 
-            output_file = self.output_filename(model_base_dir=eval_base_dir,
-                                           complement=dataset_id,
-                                           extention='csv')
+        else:
+            raise NotImplementedError(f'TrainingStrategy has not predict implemented for \
+                                    {self.training_strategy}')
 
-            if os.path.exists(output_file):
-                df = pd.read_csv(output_file)
+        return predictions
+    # def eval(self,
+    #         dataset_id: str,
+    #         eval_base_dir: str,
+    #         model_base_dir: typing.Optional[str] = None,
+    #         dataset: typing.Optional[iara_dataset.BaseDataset] = None) -> pd.DataFrame:
+    #     """
+    #     Implementation of BaseTrainer.eval method, to eval the model using the
+    #         provided dataset.
 
-                prediction_columns = [col for col in df.columns if col.startswith('Prediction_')]
-                max_prediction_index = np.argmax(df[prediction_columns].to_numpy(),axis=1)
-                df_result = pd.DataFrame({'Prediction': max_prediction_index,
-                                          'Target': df['Target']})
+    #     Args:
+    #         dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
+    #         eval_base_dir (str): The base directory to save any evaluation-related outputs
+    #             or artifacts.
+    #         model_base_dir typing.Optional(str): The base directory to save read trained models
+    #             with non set the evaluation must already be done.
+    #         dataset typing.Optional(iara_dataset.BaseDataset): The dataset to evaluate with non set
+    #             the evaluation must already be done.
 
-                return df_result
+    #     Returns:
+    #         pandas.DataFrame: DataFrame with two columns, ["Target", "Prediction"]
+    #     """
+    #     with torch.no_grad():
 
-            os.makedirs(eval_base_dir, exist_ok=True)
+    #         all_predictions = []
+    #         all_targets = []
 
-            loader = torch_data.DataLoader(dataset, batch_size=self.batch_size)
+    #         output_file = self.output_filename(model_base_dir=eval_base_dir,
+    #                                        complement=dataset_id,
+    #                                        extention='csv')
 
-            if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
-                filename = self.output_filename(model_base_dir=model_base_dir)
-                if not os.path.exists(filename):
-                    raise FileNotFoundError(f"The model file '{filename}' does not exist. Ensure \
-                                            that the model is trained before evaluating.")
+    #         if os.path.exists(output_file):
+    #             df = pd.read_csv(output_file)
 
-                model = iara_model.BaseModel.load(filename)
-                model.eval()
+    #             prediction_columns = [col for col in df.columns if col.startswith('Prediction_')]
+    #             max_prediction_index = np.argmax(df[prediction_columns].to_numpy(),axis=1)
+    #             df_result = pd.DataFrame({'Prediction': max_prediction_index,
+    #                                       'Target': df['Target']})
 
-                for samples, targets in tqdm.tqdm(loader, leave=False, desc="Eval Batchs", ncols=120):
-                    targets = targets.to(self.device)
-                    samples = samples.to(self.device)
-                    predictions = model(samples)
+    #             return df_result
 
-                    all_predictions.extend(predictions.cpu().tolist())
-                    all_targets.extend(targets.cpu().tolist())
+    #         os.makedirs(eval_base_dir, exist_ok=True)
+
+    #         loader = torch_data.DataLoader(dataset, batch_size=self.batch_size)
+
+    #         if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
+    #             filename = self.output_filename(model_base_dir=model_base_dir)
+    #             if not os.path.exists(filename):
+    #                 raise FileNotFoundError(f"The model file '{filename}' does not exist. Ensure \
+    #                                         that the model is trained before evaluating.")
+
+    #             model = iara_model.BaseModel.load(filename)
+    #             model.eval()
+
+    #             for samples, targets in tqdm.tqdm(loader, leave=False, desc="Eval Batchs", ncols=120):
+    #                 targets = targets.to(self.device)
+    #                 samples = samples.to(self.device)
+    #                 predictions = model(samples)
+
+    #                 all_predictions.extend(predictions.cpu().tolist())
+    #                 all_targets.extend(targets.cpu().tolist())
 
 
-            elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
-                models = []
-                for target_id in range(self.n_targets):
-                    filename = self.output_filename(model_base_dir=model_base_dir,
-                                                    target_id=target_id)
-                    if not os.path.exists(filename):
-                        raise FileNotFoundError(f"The model file '{filename}' does not exist. \
-                                                Ensure that the model is trained before \
-                                                evaluating.")
+    #         elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
+    #             models = []
+    #             for target_id in range(self.n_targets):
+    #                 filename = self.output_filename(model_base_dir=model_base_dir,
+    #                                                 target_id=target_id)
+    #                 if not os.path.exists(filename):
+    #                     raise FileNotFoundError(f"The model file '{filename}' does not exist. \
+    #                                             Ensure that the model is trained before \
+    #                                             evaluating.")
 
-                    model = iara_model.BaseModel.load(filename)
-                    model.eval()
-                    models.append(model)
+    #                 model = iara_model.BaseModel.load(filename)
+    #                 model.eval()
+    #                 models.append(model)
 
-                for samples, targets in tqdm.tqdm(loader, leave=False, desc="Eval Batchs", ncols=120):
-                    samples = samples.to(self.device)
+    #             for samples, targets in tqdm.tqdm(loader, leave=False, desc="Eval Batchs", ncols=120):
+    #                 samples = samples.to(self.device)
 
-                    predictions = torch.zeros((len(targets), len(models)))
-                    for model_idx, model in enumerate(models):
-                        predictions[:, model_idx] = model(samples).cpu()
+    #                 predictions = torch.zeros((len(targets), len(models)))
+    #                 for model_idx, model in enumerate(models):
+    #                     predictions[:, model_idx] = model(samples).cpu()
 
-                    all_predictions.extend(predictions.tolist())
-                    all_targets.extend(targets.cpu().tolist())
+    #                 all_predictions.extend(predictions.tolist())
+    #                 all_targets.extend(targets.cpu().tolist())
 
-            else:
-                raise NotImplementedError(f'TrainingStrategy has not is_trained implemented for \
-                                        {self.training_strategy}')
+    #         else:
+    #             raise NotImplementedError(f'TrainingStrategy has not is_trained implemented for \
+    #                                     {self.training_strategy}')
 
-            all_predictions = np.array(all_predictions)
+    #         all_predictions = np.array(all_predictions)
 
-            df = pd.DataFrame({"Target": all_targets})
-            for idx in range(all_predictions.shape[1]):
-                df[f"Prediction_{idx}"] = all_predictions[:, idx]
+    #         df = pd.DataFrame({"Target": all_targets})
+    #         for idx in range(all_predictions.shape[1]):
+    #             df[f"Prediction_{idx}"] = all_predictions[:, idx]
 
-            prediction_columns = [col for col in df.columns if col.startswith('Prediction_')]
-            max_prediction_index = np.argmax(df[prediction_columns].to_numpy(),axis=1)
-            df_result = pd.DataFrame({'Prediction': max_prediction_index, 'Target': df['Target']})
+    #         prediction_columns = [col for col in df.columns if col.startswith('Prediction_')]
+    #         max_prediction_index = np.argmax(df[prediction_columns].to_numpy(),axis=1)
+    #         df_result = pd.DataFrame({'Prediction': max_prediction_index, 'Target': df['Target']})
 
-            df.to_csv(output_file, index=False)
-            return df_result
-
+    #         df.to_csv(output_file, index=False)
+    #         return df_result
 
 class RandomForestTrainer(BaseTrainer):
     """Implementation of the BaseTrainer for training a RandomForest networks."""
@@ -700,75 +861,3 @@ class RandomForestTrainer(BaseTrainer):
 
             model.fit(samples=samples, targets=targets)
             model.save(model_filename)
-
-    def eval(self,
-            dataset_id: str,
-            eval_base_dir: str,
-            model_base_dir: typing.Optional[str] = None,
-            dataset: typing.Optional[iara_dataset.BaseDataset] = None) -> pd.DataFrame:
-        """
-        Implementation of BaseTrainer.eval method, to eval the model using the
-            provided dataset.
-
-        Args:
-            dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
-            eval_base_dir (str): The base directory to save any evaluation-related outputs
-                or artifacts.
-            model_base_dir typing.Optional(str): The base directory to save read trained models
-                with non set the evaluation must already be done.
-            dataset typing.Optional(iara_dataset.BaseDataset): The dataset to evaluate with non set
-                the evaluation must already be done.
-
-        Returns:
-            pandas.DataFrame: DataFrame with two columns, ["Target", "Prediction"]
-        """
-        with torch.no_grad():
-
-            output_file = self.output_filename(model_base_dir=eval_base_dir,
-                                           complement=dataset_id,
-                                           extention='csv')
-
-            if os.path.exists(output_file):
-                return pd.read_csv(output_file)
-
-            os.makedirs(eval_base_dir, exist_ok=True)
-
-            samples = dataset.get_samples()
-            targets = dataset.get_targets()
-            predictions = []
-
-            if self.training_strategy == ModelTrainingStrategy.MULTICLASS:
-                filename = self.output_filename(model_base_dir=model_base_dir)
-                if not os.path.exists(filename):
-                    raise FileNotFoundError(f"The model file '{filename}' does not exist. Ensure \
-                                            that the model is trained before evaluating.")
-
-                model = iara_model.BaseModel.load(filename)
-                predictions = model(samples)
-
-            elif self.training_strategy == ModelTrainingStrategy.CLASS_SPECIALIST:
-                models = []
-                for target_id in range(self.n_targets):
-                    filename = self.output_filename(model_base_dir=model_base_dir,
-                                                    target_id=target_id)
-                    if not os.path.exists(filename):
-                        raise FileNotFoundError(f"The model file '{filename}' does not exist. \
-                                                Ensure that the model is trained before \
-                                                evaluating.")
-
-                    model = iara_model.BaseModel.load(filename)
-                    models.append(model)
-
-                predictions = torch.zeros((len(targets), len(models)))
-                for model_idx, model in enumerate(models):
-                    predictions[:, model_idx] = model(samples)
-
-                predictions = predictions.argmax(dim=1).tolist()
-
-            else:
-                raise NotImplementedError(f'TrainingStrategy has not is_trained implemented for \
-                                        {self.training_strategy}')
-
-            df = pd.DataFrame({"Target": targets, "Prediction": predictions})
-            df.to_csv(output_file, index=False)
-            return df

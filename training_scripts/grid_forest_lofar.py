@@ -11,6 +11,7 @@ The chosen configuration will then be used for further training and analysis in 
 import typing
 import itertools
 import argparse
+import time
 import numpy as np
 
 import iara.records
@@ -32,11 +33,9 @@ def main(override: bool,
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
 
-    result_grid = {
-        'trn': iara_metrics.GridCompiler(),
-        'val': iara_metrics.GridCompiler(),
-        'test': iara_metrics.GridCompiler(),
-    }
+    result_grid = {}
+    for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
+        result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
 
     config_name = f'forest_lofar_{str(training_strategy)}'
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
@@ -44,15 +43,18 @@ def main(override: bool,
     config = iara_exp.Config(
                     name = config_name,
                     dataset = iara_default.default_collection(only_sample=only_sample),
-                    dataset_processor = iara_default.default_iara_mel_audio_processor(n_mels=n_mels),
+                    dataset_processor = iara_default.default_iara_lofar_audio_processor(),
                     output_base_dir = output_base_dir,
                     input_type = iara_default.default_window_input())
 
     grid_search = {
-        'Estimators': [25, 50, 75],
-        'Max depth': [5, 10, 30]
+        'Estimators': [10, 25, 50, 75, 100],
+        'Max depth': [5, 10, 15, 20, 30]
     }
-
+    # grid_search = {
+    #     'Estimators': [50],
+    #     'Max depth': [15]
+    # }
     mlp_trainers = []
     param_dict = {}
 
@@ -72,28 +74,26 @@ def main(override: bool,
 
     manager = iara_exp.Manager(config, *mlp_trainers)
 
-    manager.run(folds = folds, override = override)
+    result_dict = manager.run(folds = folds, override = override)
 
-    for dataset_id, grid in result_grid.items():
+    for (eval_subset, eval_strategy), grid in result_grid.items():
 
-        result_dict = manager.compile_results(folds = folds,
-                                                dataset_id=dataset_id,
-                                                trainer_list=mlp_trainers)
-
-        for trainer_id, results in result_dict.items():
+        for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
 
             for i_fold, result in enumerate(results):
 
                 grid.add(params=param_dict[trainer_id],
-                         i_fold=i_fold,
-                         target=result['Target'],
-                         prediction=result['Prediction'])
+                            i_fold=i_fold,
+                            target=result['Target'],
+                            prediction=result['Prediction'])
 
-    for dataset_id, grid in result_grid.items():
-        print(f'########## {dataset_id} ############')
-        print('print_cm: ' , grid.print_cm())
+    # for eval_strategy in iara_trn.EvalStrategy:
+    #     print(f'########## {iara_trn.Subset.TRN} {eval_strategy} ############')
+    #     print(result_grid[iara_trn.Subset.TRN, eval_strategy])
+
+    for (eval_subset, eval_strategy), grid in result_grid.items():
+        print(f'########## {eval_subset} {eval_strategy} ############')
         print(grid)
-
 
 if __name__ == "__main__":
     strategy_str_list = [str(i) for i in iara_trn.ModelTrainingStrategy]
@@ -109,6 +109,8 @@ if __name__ == "__main__":
                         help='Specify folds to be executed. Example: 0,4-7')
 
     args = parser.parse_args()
+
+    start_time = time.time()
 
     folds_to_execute = []
     if args.fold:
@@ -134,3 +136,7 @@ if __name__ == "__main__":
                 folds = folds_to_execute,
                 only_sample = args.only_sample,
                 training_strategy = strategy)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Elapsed time: {iara.utils.str_format_time(elapsed_time)}")

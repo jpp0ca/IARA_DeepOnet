@@ -35,11 +35,9 @@ def main(override: bool,
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
 
-    result_grid = {
-        'trn': iara_metrics.GridCompiler(),
-        'val': iara_metrics.GridCompiler(),
-        'test': iara_metrics.GridCompiler(),
-    }
+    result_grid = {}
+    for eval_subset, eval_strategy in zip(iara_trn.Subset, iara_trn.EvalStrategy):
+        result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
 
     config_name = f'mlp_lofar_{str(training_strategy)}'
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
@@ -92,25 +90,21 @@ def main(override: bool,
 
     manager = iara_exp.Manager(config, *mlp_trainers)
 
-    manager.run(folds = folds, override = override)
+    result_dict = manager.run(folds = folds, override = override)
 
-    for dataset_id, grid in result_grid.items():
+    for (eval_subset, eval_strategy), grid in result_grid.items():
 
-        result_dict = manager.compile_results(folds = folds,
-                                                dataset_id=dataset_id,
-                                                trainer_list=mlp_trainers)
-
-        for trainer_id, results in result_dict.items():
+        for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
 
             for i_fold, result in enumerate(results):
 
                 grid.add(params=param_dict[trainer_id],
-                         i_fold=i_fold,
-                         target=result['Target'],
-                         prediction=result['Prediction'])
+                            i_fold=i_fold,
+                            target=result['Target'],
+                            prediction=result['Prediction'])
 
-    for dataset_id, grid in result_grid.items():
-        print(f'########## {dataset_id} ############')
+    for (eval_subset, eval_strategy), grid in result_grid.items():
+        print(f'########## {eval_subset} {eval_strategy} ############')
         print('print_cm: ' , grid.print_cm())
         print(grid)
 

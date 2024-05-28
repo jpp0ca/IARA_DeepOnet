@@ -280,7 +280,7 @@ class LabelTarget(LabelFilter, Target):
                 to the length of 'self.values'.
         """
         if not self.include_others:
-            input_df = LabelFilter.apply(input_df)
+            input_df = LabelFilter.apply(self, input_df)
 
         input_df = input_df.assign(**{self.DEFAULT_TARGET_HEADER:
             input_df[self.column].map({value: index for index, value in enumerate(self.values)})})
@@ -376,8 +376,8 @@ class CustomCollection:
 
         df = self.to_df() if df is None else df
         if self.target.include_others:
-            df_label = df[df['Target']!=self.target.get_n_targets()]
-            df_others = df[df['Target']==self.target.get_n_targets()]
+            df_label = df[df['Target'] != self.target.get_n_targets() - 1]
+            df_others = df[df['Target'] == self.target.get_n_targets() - 1]
 
             df_label = df_label.groupby(self.target.grouped_column()).size().reset_index(name='Qty')
             new_row = pd.DataFrame({self.target.grouped_column(): ['Others'], 'Qty': [df_others.shape[0]]})

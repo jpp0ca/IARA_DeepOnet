@@ -266,33 +266,21 @@ class Manager():
                         trn_dataset=trn_dataset,
                         val_dataset=val_dataset)
 
-    def is_evaluated(self, dataset_id: str, eval_base_dir: str) -> bool:
-        """
-        Check if all models are evaluated for the specified dataset_id in the specified directory.
-
-        Args:
-            dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
-            model_base_dir (str): The directory where the trained models are expected to be saved.
-
-        Returns:
-            bool: True if all models are evaluated in the directory,
-                False otherwise.
-        """
+    def is_evaluated(self,
+            eval_subset: iara_trainer.Subset,
+            eval_base_dir: str) -> bool:
         for trainer in self.trainer_list:
-            if not trainer.is_evaluated(dataset_id=dataset_id, eval_base_dir=eval_base_dir):
+            if not trainer.is_evaluated(eval_subset = eval_subset,
+                                        eval_base_dir = eval_base_dir):
                 return False
         return True
 
-    def eval(self, i_fold: int, dataset_id: str, dataset_ids: typing.Iterable[int]) -> None:
-        """
-        Eval the model for a specified fold using the provided training and validation dataset IDs
-            and targets.
+    def eval(self,
+             i_fold: int,
+             eval_subset: iara_trainer.Subset,
+             eval_strategy: iara_trainer.EvalStrategy,
+             dataset_ids: typing.Iterable[int]) -> None:
 
-        Args:
-            i_fold (int): The index of the fold.
-            dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
-            dataset_ids (typing.Iterable[int]): Iterable of evaluated dataset IDs.
-        """
         model_base_dir = self.get_model_base_dir(i_fold)
         eval_base_dir = os.path.join(self.config.output_base_dir,
                                         'eval',
@@ -301,7 +289,8 @@ class Manager():
         if not self.is_trained(i_fold):
             raise FileNotFoundError(f'Models not trained in {model_base_dir}')
 
-        if self.is_evaluated(dataset_id=dataset_id, eval_base_dir=eval_base_dir):
+        if self.is_evaluated(eval_subset = eval_subset,
+                             eval_base_dir=eval_base_dir):
             return
 
         dataset = iara_dataset.AudioDataset(self.get_experiment_loader(),
@@ -311,27 +300,17 @@ class Manager():
         for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
                             tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers", ncols=120):
 
-            trainer.eval(dataset_id=dataset_id,
+            trainer.eval(eval_subset = eval_subset,
+                         eval_strategy = eval_strategy,
                          model_base_dir=model_base_dir,
                          eval_base_dir=eval_base_dir,
                          dataset=dataset)
 
     def compile_results(self,
-                        dataset_id: str,
+                        eval_subset: iara_trainer.Subset,
+                        eval_strategy: iara_trainer.EvalStrategy,
                         trainer_list: typing.List[iara_trainer.BaseTrainer] = None,
                         folds: typing.List[int] = None) -> typing.List[pd.DataFrame]:
-        """Compiles evaluated results for a specified trainer.
-
-        Args:
-            dataset_id (str): Identifier for the dataset, e.g., 'val', 'trn', 'test'.
-            trainer (BaseTrainer): An instance used for compilation in this
-                configuration.
-            folds (List[int], optional): List of fold to be evaluated.
-                Defaults all folds will be executed.
-
-        Returns:
-            typing.List[pd.DataFrame]: List of DataFrame with two columns, ["Target", "Prediction"].
-        """
 
         result_dict = {}
 
@@ -347,7 +326,9 @@ class Manager():
                                                 'eval',
                                                 f'fold_{i_fold}')
 
-                results.append(trainer.eval(dataset_id=dataset_id, eval_base_dir=eval_base_dir))
+                results.append(trainer.eval(eval_subset=eval_subset,
+                                            eval_strategy=eval_strategy,
+                                            eval_base_dir=eval_base_dir))
 
             result_dict[trainer.trainer_id] = results
 
@@ -385,7 +366,7 @@ class Manager():
         if folds is None or len(folds) == 0:
             folds = range(len(id_list))
 
-        # self.print_dataset_details(id_list)
+        self.print_dataset_details(id_list)
 
         for _ in tqdm.tqdm(range(1), leave=False,
                            desc="--- Fitting models ---", bar_format = "{desc}"):
@@ -400,21 +381,29 @@ class Manager():
                         trn_dataset_ids=trn_set['ID'].to_list(),
                         val_dataset_ids=val_set['ID'].to_list())
 
-                self.eval(i_fold=i_fold,
-                          dataset_id='trn',
-                          dataset_ids=trn_set['ID'].to_list())
+                id_set = {
+                    iara_trainer.Subset.TRN: trn_set,
+                    iara_trainer.Subset.VAL: val_set,
+                    iara_trainer.Subset.TEST: test_set,
+                }
 
-                self.eval(i_fold=i_fold,
-                          dataset_id='val',
-                          dataset_ids=val_set['ID'].to_list())
+                for eval_subset, eval_strategy in itertools.product(iara_trainer.Subset, iara_trainer.EvalStrategy):
+                    self.eval(i_fold=i_fold,
+                                eval_subset=eval_subset,
+                                eval_strategy=eval_strategy,
+                                dataset_ids=id_set[eval_subset]['ID'].to_list())
 
-                self.eval(i_fold=i_fold,
-                          dataset_id='test',
-                          dataset_ids=test_set['ID'].to_list())
 
-        return self.compile_results(dataset_id='test',
-                                trainer_list=self.trainer_list,
-                                folds=folds)
+        eval_dict = {}
+
+        for eval_subset, eval_strategy in itertools.product(iara_trainer.Subset, iara_trainer.EvalStrategy):
+            eval_dict[(eval_subset, eval_strategy)] = \
+                    self.compile_results(eval_subset=eval_subset,
+                                        eval_strategy=eval_strategy,
+                                        trainer_list=self.trainer_list,
+                                        folds=folds)
+
+        return eval_dict
 
 
 class Comparator():

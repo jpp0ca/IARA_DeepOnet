@@ -12,10 +12,12 @@ import typing
 import itertools
 import argparse
 import tqdm
+import time
 
 import numpy as np
 
 import iara.records
+import iara.utils
 import iara.ml.experiment as iara_exp
 import iara.ml.dataset as iara_dataset
 import iara.ml.models.trainer as iara_trn
@@ -34,14 +36,12 @@ def main(override: bool,
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
 
-    result_grid = {
-        'trn': iara_metrics.GridCompiler(),
-        'val': iara_metrics.GridCompiler(),
-        'test': iara_metrics.GridCompiler(),
-    }
+    result_grid = {}
+    for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
+        result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
 
-    for n_mels in tqdm.tqdm([128], leave=False, desc="N_mels", ncols=120):
-    # for n_mels in tqdm.tqdm([16, 32, 64, 128, 256], leave=False, desc="N_mels", ncols=120):
+    for n_mels in tqdm.tqdm([16, 32, 64, 128, 256], leave=False, desc="N_mels", ncols=120):
+    # for n_mels in tqdm.tqdm([128], leave=False, desc="N_mels", ncols=120):
 
         config_name = f'forest_mel_{n_mels}_{str(training_strategy)}'
 
@@ -54,14 +54,14 @@ def main(override: bool,
                 output_base_dir = output_base_dir,
                 input_type = iara_default.default_window_input())
 
-        # grid_search = {
-        #     'Estimators': [10, 25, 50, 75],
-        #     'Max depth': [5, 10, 30]
-        # }
         grid_search = {
-            'Estimators': [50],
-            'Max depth': [10]
+            'Estimators': [10, 25, 50, 75, 100],
+            'Max depth': [5, 10, 15, 20, 30]
         }
+        # grid_search = {
+        #     'Estimators': [50],
+        #     'Max depth': [15]
+        # }
 
         mlp_trainers = []
         param_dict = {}
@@ -80,17 +80,14 @@ def main(override: bool,
                                     n_estimators = param_pack['Estimators'],
                                     max_depth = param_pack['Max depth']))
 
+
         manager = iara_exp.Manager(config, *mlp_trainers)
 
-        manager.run(folds = folds, override = override)
+        result_dict = manager.run(folds = folds, override = override)
 
-        for dataset_id, grid in result_grid.items():
+        for (eval_subset, eval_strategy), grid in result_grid.items():
 
-            result_dict = manager.compile_results(folds = folds,
-                                                  dataset_id=dataset_id,
-                                                  trainer_list=mlp_trainers)
-
-            for trainer_id, results in result_dict.items():
+            for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
 
                 for i_fold, result in enumerate(results):
 
@@ -99,9 +96,8 @@ def main(override: bool,
                              target=result['Target'],
                              prediction=result['Prediction'])
 
-    for dataset_id, grid in result_grid.items():
-        print(f'########## {dataset_id} ############')
-        print('print_cm: ' , grid.print_cm())
+    for (eval_subset, eval_strategy), grid in result_grid.items():
+        print(f'########## {eval_subset} {eval_strategy} ############')
         print(grid)
 
 
@@ -119,6 +115,8 @@ if __name__ == "__main__":
                         help='Specify folds to be executed. Example: 0,4-7')
 
     args = parser.parse_args()
+
+    start_time = time.time()
 
     folds_to_execute = []
     if args.fold:
@@ -144,3 +142,7 @@ if __name__ == "__main__":
                 folds = folds_to_execute,
                 only_sample = args.only_sample,
                 training_strategy = strategy)
+
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Elapsed time: {iara.utils.str_format_time(elapsed_time)}")
