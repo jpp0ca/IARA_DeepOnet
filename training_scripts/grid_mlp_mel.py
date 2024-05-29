@@ -27,6 +27,7 @@ import iara.processing.manager as iara_manager
 
 import iara.default as iara_default
 from iara.default import DEFAULT_DIRECTORIES
+import iara.utils
 
 def main(override: bool,
         folds: typing.List[int],
@@ -34,7 +35,7 @@ def main(override: bool,
         training_strategy: iara_trn.ModelTrainingStrategy):
     """Grid search main function"""
 
-    grid_str = 'grid_search_5' if not only_sample else 'grid_search_sample'
+    grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
 
     result_grid = {}
     for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
@@ -119,6 +120,7 @@ def main(override: bool,
         print(grid)
 
 if __name__ == "__main__":
+    iara.utils.print_available_device()
     strategy_str_list = [str(i) for i in iara_trn.ModelTrainingStrategy]
 
     parser = argparse.ArgumentParser(description='RUN MLP grid search analysis')

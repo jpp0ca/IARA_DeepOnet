@@ -37,132 +37,120 @@ def main(override: bool,
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
 
-    config_dir = f"{DEFAULT_DIRECTORIES.config_dir}/{grid_str}"
+    result_grid = {}
+    for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
+        result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
 
-    configs = {
-        f'cnn_lofar_{str(training_strategy)}': iara.records.Collection.OS_SHIP
+    config_name = f'cnn_lofar_{str(training_strategy)}'
+    output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
+
+    config = iara_exp.Config(
+                    name = config_name,
+                    dataset = iara_default.default_collection(only_sample=only_sample),
+                    dataset_processor = iara_default.default_iara_lofar_audio_processor(),
+                    output_base_dir = output_base_dir,
+                    input_type = iara_default.default_image_input())
+
+    grid_search = {
+        'conv_n_neurons': ['16, 32, 64, 12'],
+        'classification_n_neurons': [128],
+        'Activation': ['ReLU'],
+        'Weight decay': [1e-3],
+        'conv_pooling': ['Max'],
+        'kernel': [5],
+        'dropout' : [0.5]
+    }
+    # grid_search = {
+    #     'conv_n_neurons': ['16, 32',
+    #                         '16, 32, 64',
+    #                         '16, 32, 64, 12'],
+    #     'classification_n_neurons': [16, 128, 1024],
+    #     'Activation': ['ReLU', 'PReLU', 'LeakyReLU'],
+    #     'Weight decay': [0, 1e-3, 1e-5],
+    #     'conv_pooling': ['Max', 'Avg'],
+    #     'kernel': [3, 5],
+    #     'dropout' : [0.2, 0.4, 0.6]
+    # }
+
+    conv_dict = {
+            '16, 32': [16, 32],
+            '32, 64': [32, 64],
+            '16, 32, 64': [16, 32, 64],
+            '16, 32, 64, 12': [16, 32, 64, 128]
     }
 
-    for config_name, collection in configs.items():
+    activation_dict = {
+            'Tanh': torch.nn.Tanh(),
+            'ReLU': torch.nn.ReLU(),
+            'PReLU': torch.nn.PReLU(),
+            'LeakyReLU': torch.nn.LeakyReLU()
+    }
 
-        config = False
-        if not override:
-            try:
-                config = iara_exp.Config.load(config_dir, config_name)
+    pooling_dict = {
+            'Max': torch.nn.MaxPool2d(2, 2),
+            'Avg': torch.nn.AvgPool2d(2, 2)
+    }
 
-            except FileNotFoundError:
-                pass
+    mlp_trainers = []
+    param_dict = {}
 
-        if not config:
-            custom_collection = iara.records.CustomCollection(
-                            collection = collection,
-                            target = iara.records.LabelTarget(
-                                column = 'TYPE',
-                                values = ['Cargo', 'Tanker', 'Tug'],
-                                include_others = include_other
-                            ),
-                            only_sample=only_sample
-                        )
+    combinations = list(itertools.product(*grid_search.values()))
+    for combination in combinations:
+        param_pack = dict(zip(grid_search.keys(), combination))
 
-            output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
+        weight_str = f"{param_pack['Weight decay']:.0e}" if param_pack['Weight decay'] != 0 else '0'
 
-            config = iara_exp.Config(
-                            name = config_name,
-                            dataset = custom_collection,
-                            dataset_processor = iara_default.default_iara_lofar_audio_processor(),
-                            input_type = iara_dataset.InputType.Image(16, 0.5),
-                            output_base_dir = output_base_dir)
+        trainer_id = f"cnn_{param_pack['conv_n_neurons']}_\
+                {param_pack['classification_n_neurons']}_{param_pack['Activation']}_\
+                {weight_str}_{param_pack['conv_pooling']}"
 
-            config.save(config_dir)
+        param_dict[trainer_id] = param_pack
 
-        mlp_trainers = []
+        mlp_trainers.append(iara_trn.OptimizerTrainer(
+                training_strategy=training_strategy,
+                trainer_id = trainer_id,
+                n_targets = config.dataset.target.get_n_targets(),
+                model_allocator=lambda input_shape, n_targets,
+                    conv_neurons=conv_dict[param_pack['conv_n_neurons']],
+                    class_neurons=param_pack['classification_n_neurons'],
+                    activation=activation_dict[param_pack['Activation']],
+                    pooling=pooling_dict[param_pack['conv_pooling']],
+                    dropout=param_pack['dropout'],
+                    kernel=param_pack['kernel']:
+                        iara_cnn.CNN(
+                            input_shape=input_shape,
+                            conv_activation = activation,
+                            conv_n_neurons=conv_neurons,
+                            conv_pooling=pooling,
+                            kernel_size=kernel,
+                            classification_n_neurons=class_neurons,
+                            n_targets=n_targets,
+                            dropout_prob=dropout),
+                optimizer_allocator=lambda model, weight_decay=param_pack['Weight decay']:
+                    torch.optim.Adam(model.parameters(),
+                                        weight_decay=weight_decay),
+                batch_size = 64))
 
-        # grid_search = {
-        #     'conv_n_neurons': [
-        #                 [16, 32],
-        #                 [32, 64],
-        #                 [16, 32, 64]
-        #             ],
-        #     'classification_n_neurons': [16, 128, 1024],
-        #     'Activation': ['ReLU', 'PReLU', 'LeakyReLU'],
-        #     'Weight decay': [0, 1e-3, 1e-5],
-        #     'conv_pooling': ['Max', 'Avg'],
-        #     'kernel': [3, 5],
-        # }
+    manager = iara_exp.Manager(config, *mlp_trainers)
 
-        grid_search = {
-            'conv_n_neurons': [
-                        [16, 32],
-                    ],
-            'classification_n_neurons': [128],
-            'Activation': ['LeakyReLU'],
-            'Weight decay': [0],
-            'conv_pooling': ['Avg'],
-            'kernel': [5],
-        }
+    manager.run(folds = folds, override = override)
 
-        activation_dict = {
-                'Tanh': torch.nn.Tanh(),
-                'ReLU': torch.nn.ReLU(),
-                'PReLU': torch.nn.PReLU(),
-                'LeakyReLU': torch.nn.LeakyReLU()
-        }
+    result_dict = manager.run(folds = folds, override = override)
 
-        pooling_dict = {
-                'Max': torch.nn.MaxPool2d(2, 2),
-                'Avg': torch.nn.AvgPool2d(2, 2)
-        }
+    for (eval_subset, eval_strategy), grid in result_grid.items():
 
-        param_dict = {}
-
-        combinations = list(itertools.product(*grid_search.values()))
-        for combination in combinations:
-            param_pack = dict(zip(grid_search.keys(), combination))
-
-            weight_str = f"{param_pack['Weight decay']:.0e}" if param_pack['Weight decay'] != 0 else '0'
-
-            trainer_id = f"cnn_{param_pack['conv_n_neurons']}_\
-                    {param_pack['classification_n_neurons']}_{param_pack['Activation']}_\
-                    {weight_str}_{param_pack['conv_pooling']}"
-
-            param_dict[trainer_id] = param_pack
-
-            mlp_trainers.append(iara_trn.OptimizerTrainer(
-                    training_strategy=training_strategy,
-                    trainer_id = trainer_id,
-                    n_targets = config.dataset.target.get_n_targets(),
-                    model_allocator=lambda input_shape, n_targets,
-                        conv_neurons=param_pack['conv_n_neurons'],
-                        class_neurons=param_pack['classification_n_neurons'],
-                        activation=activation_dict[param_pack['Activation']],
-                        pooling=pooling_dict[param_pack['conv_pooling']],
-                        kernel=param_pack['kernel']:
-                            iara_cnn.CNN(
-                                input_shape=input_shape,
-                                conv_activation = activation,
-                                conv_n_neurons=conv_neurons,
-                                kernel_size=kernel,
-                                classification_n_neurons=class_neurons,
-                                n_targets=n_targets),
-                    optimizer_allocator=lambda model, weight_decay=param_pack['Weight decay']:
-                        torch.optim.Adam(model.parameters(),
-                                         weight_decay=weight_decay),
-                    batch_size = 64))
-
-        manager = iara_exp.Manager(config, *mlp_trainers)
-
-        result_dict = manager.run(folds = folds)
-
-        grid = iara_metrics.GridCompiler()
-        for trainer_id, results in result_dict.items():
+        for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
 
             for i_fold, result in enumerate(results):
 
-                grid.add(params={'trainer_id': trainer_id},
-                         i_fold=i_fold,
-                         target=result['Target'],
-                         prediction=result['Prediction'])
+                grid.add(params=param_dict[trainer_id],
+                            i_fold=i_fold,
+                            target=result['Target'],
+                            prediction=result['Prediction'])
 
+    for dataset_id, grid in result_grid.items():
+        print(f'########## {dataset_id} ############')
+        # print('print_cm: ' , grid.print_cm())
         print(grid)
 
 

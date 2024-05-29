@@ -101,4 +101,4 @@ def default_window_input():
     return iara_dataset.InputType.Window()
 
 def default_image_input():
-    return iara_dataset.InputType.Image(32)
+    return iara_dataset.InputType.Image(n_windows=16, overlap=0.5)

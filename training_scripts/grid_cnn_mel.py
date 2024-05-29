@@ -33,8 +33,9 @@ def main(override: bool,
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
 
-    grid_val = iara_metrics.GridCompiler()
-    grid_trn = iara_metrics.GridCompiler()
+    result_grid = {}
+    for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
+        result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
 
     config_name = f'cnn_mel_{str(training_strategy)}'
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
@@ -44,19 +45,35 @@ def main(override: bool,
                     dataset = iara_default.default_collection(only_sample=only_sample),
                     dataset_processor = iara_default.default_iara_mel_audio_processor(),
                     output_base_dir = output_base_dir,
-                    input_type = iara_dataset.InputType.Image(n_windows=16, overlap=0.5))
+                    input_type = iara_default.default_image_input())
+
+    # grid_search = {
+    #     'conv_n_neurons': ['16, 32, 64, 12'],
+    #     'classification_n_neurons': [128],
+    #     'Activation': ['ReLU'],
+    #     'Weight decay': [1e-3],
+    #     'conv_pooling': ['Max'],
+    #     'kernel': [5],
+    #     'dropout' : [0.5]
+    # }
 
     grid_search = {
-        'conv_n_neurons': [
-                    [16, 32],
-                    [32, 64],
-                    [16, 32, 64]
-                ],
+        'conv_n_neurons': ['16, 32',
+                            '16, 32, 64',
+                            '16, 32, 64, 12'],
         'classification_n_neurons': [16, 128, 1024],
         'Activation': ['ReLU', 'PReLU', 'LeakyReLU'],
         'Weight decay': [0, 1e-3, 1e-5],
         'conv_pooling': ['Max', 'Avg'],
         'kernel': [3, 5],
+        'dropout' : [0.2, 0.4, 0.6]
+    }
+
+    conv_dict = {
+            '16, 32': [16, 32],
+            '32, 64': [32, 64],
+            '16, 32, 64': [16, 32, 64],
+            '16, 32, 64, 12': [16, 32, 64, 128]
     }
 
     activation_dict = {
@@ -81,7 +98,7 @@ def main(override: bool,
 
         trainer_id = f"cnn_{param_pack['conv_n_neurons']}_\
                 {param_pack['classification_n_neurons']}_{param_pack['Activation']}_\
-                {weight_str}_{param_pack['conv_pooling']}"
+                {weight_str}_{param_pack['conv_pooling']}_{param_pack['dropout']}"
 
         param_dict[trainer_id] = param_pack
 
@@ -90,10 +107,11 @@ def main(override: bool,
                 trainer_id = trainer_id,
                 n_targets = config.dataset.target.get_n_targets(),
                 model_allocator=lambda input_shape, n_targets,
-                    conv_neurons=param_pack['conv_n_neurons'],
+                    conv_neurons=conv_dict[param_pack['conv_n_neurons']],
                     class_neurons=param_pack['classification_n_neurons'],
                     activation=activation_dict[param_pack['Activation']],
                     pooling=pooling_dict[param_pack['conv_pooling']],
+                    dropout=param_pack['dropout'],
                     kernel=param_pack['kernel']:
                         iara_cnn.CNN(
                             input_shape=input_shape,
@@ -102,38 +120,34 @@ def main(override: bool,
                             conv_pooling=pooling,
                             kernel_size=kernel,
                             classification_n_neurons=class_neurons,
-                            n_targets=n_targets),
+                            n_targets=n_targets,
+                            dropout_prob=dropout),
                 optimizer_allocator=lambda model, weight_decay=param_pack['Weight decay']:
                     torch.optim.Adam(model.parameters(),
                                         weight_decay=weight_decay),
-                batch_size = 512))
+                batch_size = 128))
 
     manager = iara_exp.Manager(config, *mlp_trainers)
 
-    result_dict = manager.run(folds = folds)
+    manager.run(folds = folds, override = override)
 
-    for trainer_id, results in result_dict.items():
+    result_dict = manager.run(folds = folds, override = override)
 
-        for i_fold, result in enumerate(results):
+    for (eval_subset, eval_strategy), grid in result_grid.items():
 
-            grid_val.add(params=param_dict[trainer_id],
-                        i_fold=i_fold,
-                        target=result['Target'],
-                        prediction=result['Prediction'])
+        for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
 
-    result_dict = manager.compile_results(folds = folds, dataset_id='trn', trainer_list=mlp_trainers)
+            for i_fold, result in enumerate(results):
 
-    for trainer_id, results in result_dict.items():
+                grid.add(params=param_dict[trainer_id],
+                            i_fold=i_fold,
+                            target=result['Target'],
+                            prediction=result['Prediction'])
 
-        for i_fold, result in enumerate(results):
-
-            grid_trn.add(params=param_dict[trainer_id],
-                        i_fold=i_fold,
-                        target=result['Target'],
-                        prediction=result['Prediction'])
-
-    print(grid_trn)
-    print(grid_val)
+    for dataset_id, grid in result_grid.items():
+        print(f'########## {dataset_id} ############')
+        # print('print_cm: ' , grid.print_cm())
+        print(grid)
 
 
 if __name__ == "__main__":

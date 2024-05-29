@@ -7,11 +7,15 @@ import iara.ml.dataset as iara_dataset
 import iara.default as iara_default
 from iara.default import DEFAULT_DIRECTORIES
 
+# params = {
+#     'Processor': [iara_default.default_iara_lofar_audio_processor(),
+#                   iara_default.default_iara_mel_audio_processor()],
+#     'Input': [iara_dataset.InputType.Image(32, 0.5),
+#               iara_dataset.InputType.Window()]
+# }
 params = {
-    'Processor': [iara_default.default_iara_lofar_audio_processor(),
-                  iara_default.default_iara_mel_audio_processor()],
-    'Input': [iara_dataset.InputType.Image(32, 0.5),
-              iara_dataset.InputType.Window()]
+    'Processor': [iara_default.default_iara_lofar_audio_processor()],
+    'Input': [iara_dataset.InputType.Image(16, 0.5)]
 }
 
 custom_collection = iara_default.default_collection()

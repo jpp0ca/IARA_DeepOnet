@@ -16,6 +16,7 @@ class CNN(iara_model.BaseModel):
                  kernel_size: int = 5,
                  padding: int = 2,
                  n_targets: int = 1,
+                 dropout_prob: float = 0.5,
                  classification_hidden_activation: torch.nn.Module = None,
                  classification_output_activation: torch.nn.Module = torch.nn.Sigmoid()):
         super().__init__()
@@ -37,6 +38,8 @@ class CNN(iara_model.BaseModel):
                                                kernel_size=kernel_size, padding=padding))
             if back_norm:
                 conv_layers.append(torch.nn.BatchNorm2d(conv[i]))
+            if dropout_prob != 0 and i != 0:
+                conv_layers.append(torch.nn.Dropout2d(p=dropout_prob))
             conv_layers.append(conv_activation)
             conv_layers.append(conv_pooling)
 
