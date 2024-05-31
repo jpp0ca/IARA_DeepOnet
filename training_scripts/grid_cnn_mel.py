@@ -47,33 +47,40 @@ def main(override: bool,
                     output_base_dir = output_base_dir,
                     input_type = iara_default.default_image_input())
 
-    # grid_search = {
-    #     'conv_n_neurons': ['16, 32, 64, 12'],
-    #     'classification_n_neurons': [128],
-    #     'Activation': ['ReLU'],
-    #     'Weight decay': [1e-3],
-    #     'conv_pooling': ['Max'],
-    #     'kernel': [5],
-    #     'dropout' : [0.5]
-    # }
-
     grid_search = {
         'conv_n_neurons': ['16, 32',
                             '16, 32, 64',
-                            '16, 32, 64, 12'],
-        'classification_n_neurons': [16, 128, 1024],
-        'Activation': ['ReLU', 'PReLU', 'LeakyReLU'],
-        'Weight decay': [0, 1e-3, 1e-5],
-        'conv_pooling': ['Max', 'Avg'],
-        'kernel': [3, 5],
-        'dropout' : [0.2, 0.4, 0.6]
+                            '32, 64, 128',
+                            '16, 32, 64, 128',
+                            '32, 64, 128, 256'],
+        # 'conv_n_neurons': ['16, 32, 64, 128'],
+
+        # 'classification_n_neurons': [16, 32, 64, 128, 256, 512, 1024],
+        'classification_n_neurons': [128],
+
+        # 'Activation': ['ReLU', 'PReLU', 'LeakyReLU'],
+        'Activation': ['ReLU'],
+
+        # 'Weight decay': [0, 1e-3, 1e-5],
+        'Weight decay': [1e-3],
+
+        # 'conv_pooling': ['Max', 'Avg'],
+        'conv_pooling': ['Max'],
+
+        # 'kernel': [3, 5],
+        'kernel': [5],
+
+        # 'dropout' : [0.2, 0.4, 0.6]
+        'dropout' : [0.2]
     }
 
     conv_dict = {
             '16, 32': [16, 32],
             '32, 64': [32, 64],
             '16, 32, 64': [16, 32, 64],
-            '16, 32, 64, 12': [16, 32, 64, 128]
+            '32, 64, 128': [32, 64, 128],
+            '16, 32, 64, 128': [16, 32, 64, 128],
+            '32, 64, 128, 256': [32, 64, 128, 256]
     }
 
     activation_dict = {
@@ -96,9 +103,7 @@ def main(override: bool,
         param_pack = dict(zip(grid_search.keys(), combination))
         weight_str = f"{param_pack['Weight decay']:.0e}" if param_pack['Weight decay'] != 0 else '0'
 
-        trainer_id = f"cnn_{param_pack['conv_n_neurons']}_\
-                {param_pack['classification_n_neurons']}_{param_pack['Activation']}_\
-                {weight_str}_{param_pack['conv_pooling']}_{param_pack['dropout']}"
+        trainer_id = f"cnn_{param_pack['conv_n_neurons']}_{param_pack['classification_n_neurons']}_{param_pack['Activation']}_{weight_str}_{param_pack['conv_pooling']}_{param_pack['kernel']}_{param_pack['dropout']}"
 
         param_dict[trainer_id] = param_pack
 

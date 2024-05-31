@@ -3,6 +3,7 @@ import torch
 
 import iara.ml.models.base_model as iara_model
 import iara.ml.models.mlp as iara_mlp
+import iara.utils
 
 class CNN(iara_model.BaseModel):
 
@@ -48,7 +49,12 @@ class CNN(iara_model.BaseModel):
         test_shape = [1]
         test_shape.extend(input_shape)
         test_tensor = torch.rand(test_shape, dtype=torch.float32)
+        device = next(self.parameters()).device
+        test_tensor = test_tensor.to(device)
+        self.conv_layers = self.conv_layers.to(device)
+
         test_tensor = self.to_feature_space(test_tensor)
+
 
         self.mlp = iara_mlp.MLP(input_shape = test_tensor.shape,
                                 n_neurons = classification_n_neurons,

@@ -29,7 +29,6 @@ from iara.default import DEFAULT_DIRECTORIES
 def main(override: bool,
         folds: typing.List[int],
         only_sample: bool,
-        include_other: bool,
         training_strategy: iara_trn.ModelTrainingStrategy):
     """Grid search main function"""
 
@@ -52,31 +51,39 @@ def main(override: bool,
                     input_type = iara_default.default_image_input())
 
     grid_search = {
-        'conv_n_neurons': ['16, 32, 64, 12'],
+        'conv_n_neurons': ['16, 32',
+                            '16, 32, 64',
+                            '32, 64, 128',
+                            '16, 32, 64, 128',
+                            '32, 64, 128, 256'],
+        # 'conv_n_neurons': ['16, 32, 64, 128'],
+
+        # 'classification_n_neurons': [16, 32, 64, 128, 256, 512, 1024],
         'classification_n_neurons': [128],
+
+        # 'Activation': ['ReLU', 'PReLU', 'LeakyReLU'],
         'Activation': ['ReLU'],
+
+        # 'Weight decay': [0, 1e-3, 1e-5],
         'Weight decay': [1e-3],
+
+        # 'conv_pooling': ['Max', 'Avg'],
         'conv_pooling': ['Max'],
+
+        # 'kernel': [3, 5],
         'kernel': [5],
-        'dropout' : [0.5]
+
+        # 'dropout' : [0.2, 0.4, 0.6]
+        'dropout' : [0.2]
     }
-    # grid_search = {
-    #     'conv_n_neurons': ['16, 32',
-    #                         '16, 32, 64',
-    #                         '16, 32, 64, 12'],
-    #     'classification_n_neurons': [16, 128, 1024],
-    #     'Activation': ['ReLU', 'PReLU', 'LeakyReLU'],
-    #     'Weight decay': [0, 1e-3, 1e-5],
-    #     'conv_pooling': ['Max', 'Avg'],
-    #     'kernel': [3, 5],
-    #     'dropout' : [0.2, 0.4, 0.6]
-    # }
 
     conv_dict = {
             '16, 32': [16, 32],
             '32, 64': [32, 64],
             '16, 32, 64': [16, 32, 64],
-            '16, 32, 64, 12': [16, 32, 64, 128]
+            '32, 64, 128': [32, 64, 128],
+            '16, 32, 64, 128': [16, 32, 64, 128],
+            '32, 64, 128, 256': [32, 64, 128, 256]
     }
 
     activation_dict = {
@@ -100,9 +107,7 @@ def main(override: bool,
 
         weight_str = f"{param_pack['Weight decay']:.0e}" if param_pack['Weight decay'] != 0 else '0'
 
-        trainer_id = f"cnn_{param_pack['conv_n_neurons']}_\
-                {param_pack['classification_n_neurons']}_{param_pack['Activation']}_\
-                {weight_str}_{param_pack['conv_pooling']}"
+        trainer_id = f"cnn_{param_pack['conv_n_neurons']}_{param_pack['classification_n_neurons']}_{param_pack['Activation']}_{weight_str}_{param_pack['conv_pooling']}_{param_pack['kernel']}_{param_pack['dropout']}"
 
         param_dict[trainer_id] = param_pack
 
@@ -129,7 +134,7 @@ def main(override: bool,
                 optimizer_allocator=lambda model, weight_decay=param_pack['Weight decay']:
                     torch.optim.Adam(model.parameters(),
                                         weight_decay=weight_decay),
-                batch_size = 64))
+                batch_size = 128))
 
     manager = iara_exp.Manager(config, *mlp_trainers)
 
@@ -164,8 +169,6 @@ if __name__ == "__main__":
                         help='Ignore old runs')
     parser.add_argument('--only_sample', action='store_true', default=False,
                         help='Execute only in sample_dataset. For quick training and test.')
-    parser.add_argument('--exclude_other', action='store_true', default=False,
-                        help='Include records besides than [Cargo, Tanker, Tug] in training.')
     parser.add_argument('--training_strategy', type=str, choices=strategy_str_list,
                         default=None, help='Strategy for training the model')
     parser.add_argument('--fold', type=str, default='',
@@ -188,7 +191,6 @@ if __name__ == "__main__":
         main(override = args.override,
             folds = folds_to_execute,
             only_sample = args.only_sample,
-            include_other = not args.exclude_other,
             training_strategy = iara_trn.ModelTrainingStrategy(index))
 
     else:
@@ -196,5 +198,4 @@ if __name__ == "__main__":
             main(override = args.override,
                 folds = folds_to_execute,
                 only_sample = args.only_sample,
-                include_other = not args.exclude_other,
                 training_strategy = strategy)
