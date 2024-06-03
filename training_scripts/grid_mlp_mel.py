@@ -51,15 +51,14 @@ def main(override: bool,
                     output_base_dir = output_base_dir,
                     input_type = iara_default.default_window_input())
 
-    # grid_search = {
-    #     'Neurons': [4, 16, 64, 256, 1024],
-    #     'Activation': ['Tanh', 'ReLU', 'PReLU'],
-    #     'Weight decay': [0, 1e-3, 1e-5]
-    # }
-
     grid_search = {
-        'Neurons': [64],
-        'Activation': ['ReLU'],
+        # 'Neurons': [4, 16, 64, 128, 256, 1024],
+        'Neurons': [128],
+
+        'Activation': ['Tanh', 'ReLU', 'PReLU'],
+        # 'Activation': ['ReLU'],
+
+        # 'Weight decay': [0, 1e-3, 1e-5]
         'Weight decay': [1e-3]
     }
 

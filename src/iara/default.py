@@ -71,7 +71,7 @@ def default_iara_lofar_audio_processor(directories: Directories = DEFAULT_DIRECT
     )
 
 def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTORIES,
-                                     n_mels: int = 128):
+                                     n_mels: int = 256):
     """Method to get default AudioFileProcessor for iara."""
     return iara_manager.AudioFileProcessor(
         data_base_dir = directories.data_dir,

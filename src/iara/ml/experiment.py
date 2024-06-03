@@ -334,6 +334,38 @@ class Manager():
 
         return result_dict
 
+    def compile_existing_results(self,
+                        eval_subset: iara_trainer.Subset,
+                        eval_strategy: iara_trainer.EvalStrategy,
+                        trainer_list: typing.List[iara_trainer.BaseTrainer] = None,
+                        folds: typing.List[int] = None) -> typing.List[pd.DataFrame]:
+
+        result_dict = {}
+
+        for trainer in trainer_list if trainer_list is not None else self.trainer_list:
+
+            results = []
+            for i_fold in range(self.config.get_n_folds()):
+
+                if folds and i_fold not in folds:
+                    continue
+
+                eval_base_dir = os.path.join(self.config.output_base_dir,
+                                                'eval',
+                                                f'fold_{i_fold}')
+                
+                if not trainer.is_evaluated(eval_subset=eval_subset,
+                                            eval_base_dir=eval_base_dir):
+                    continue
+
+                results.append(trainer.eval(eval_subset=eval_subset,
+                                            eval_strategy=eval_strategy,
+                                            eval_base_dir=eval_base_dir))
+
+            result_dict[trainer.trainer_id] = results
+
+        return result_dict
+
     def print_dataset_details(self, id_list) -> None:
 
         df = self.config.dataset.to_compiled_df()

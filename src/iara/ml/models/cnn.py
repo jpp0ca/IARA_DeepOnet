@@ -15,7 +15,7 @@ class CNN(iara_model.BaseModel):
                  conv_pooling: torch.nn.Module = torch.nn.MaxPool2d(2, 2),
                  back_norm: bool = True,
                  kernel_size: int = 5,
-                 padding: int = 2,
+                 padding: int = None,
                  n_targets: int = 1,
                  dropout_prob: float = 0.5,
                  classification_hidden_activation: torch.nn.Module = None,
@@ -23,6 +23,7 @@ class CNN(iara_model.BaseModel):
         super().__init__()
 
         classification_hidden_activation = conv_activation if classification_hidden_activation is None else classification_hidden_activation
+        padding = padding if padding is not None else int((kernel_size-1)/2)
 
         if len(input_shape) != 3:
             raise UnboundLocalError(f"CNN expects as input an image in the format: \

@@ -50,28 +50,27 @@ def main(override: bool,
     grid_search = {
         'conv_n_neurons': ['16, 32',
                             '16, 32, 64',
-                            '32, 64, 128',
                             '16, 32, 64, 128',
                             '32, 64, 128, 256'],
         # 'conv_n_neurons': ['16, 32, 64, 128'],
 
-        # 'classification_n_neurons': [16, 32, 64, 128, 256, 512, 1024],
-        'classification_n_neurons': [128],
+        'classification_n_neurons': [16, 32, 64, 128, 256, 512, 1024],
+        # 'classification_n_neurons': [64],
 
-        # 'Activation': ['ReLU', 'PReLU', 'LeakyReLU'],
-        'Activation': ['ReLU'],
+        'Activation': ['ReLU', 'PReLU', 'LeakyReLU'],
+        # 'Activation': ['ReLU'],
 
-        # 'Weight decay': [0, 1e-3, 1e-5],
-        'Weight decay': [1e-3],
+        'Weight decay': [0, 1e-3, 1e-5],
+        # 'Weight decay': [0],
 
-        # 'conv_pooling': ['Max', 'Avg'],
-        'conv_pooling': ['Max'],
+        'conv_pooling': ['Max', 'Avg'],
+        # 'conv_pooling': ['Avg'],
 
-        # 'kernel': [3, 5],
-        'kernel': [5],
+        'kernel': [3, 5, 7],
+        # 'kernel': [3],
 
-        # 'dropout' : [0.2, 0.4, 0.6]
-        'dropout' : [0.2]
+        'dropout' : [0.2, 0.4, 0.6]
+        # 'dropout' : [0.4]
     }
 
     conv_dict = {
@@ -134,11 +133,16 @@ def main(override: bool,
 
     manager = iara_exp.Manager(config, *mlp_trainers)
 
-    manager.run(folds = folds, override = override)
-
-    result_dict = manager.run(folds = folds, override = override)
+    result_dict = {}
+    # result_dict = manager.run(folds = folds, override = override)
 
     for (eval_subset, eval_strategy), grid in result_grid.items():
+
+        result_dict[eval_subset, eval_strategy] = manager.compile_existing_results(
+                        eval_subset = eval_subset,
+                        eval_strategy = eval_strategy,
+                        trainer_list = mlp_trainers,
+                        folds = folds)
 
         for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
 
