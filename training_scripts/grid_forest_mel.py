@@ -41,7 +41,7 @@ def main(override: bool,
         result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
 
     for n_mels in tqdm.tqdm([16, 32, 64, 128, 256], leave=False, desc="N_mels", ncols=120):
-    # for n_mels in tqdm.tqdm([128], leave=False, desc="N_mels", ncols=120):
+    # for n_mels in tqdm.tqdm([256], leave=False, desc="N_mels", ncols=120):
 
         config_name = f'forest_mel_{n_mels}_{str(training_strategy)}'
 
@@ -55,14 +55,12 @@ def main(override: bool,
                 input_type = iara_default.default_window_input())
 
         grid_search = {
-            'Estimators': [10, 25, 50, 75, 100],
-            'Max depth': [5, 10, 15, 20, 30]
-        }
-        # grid_search = {
-        #     'Estimators': [50],
-        #     'Max depth': [15]
-        # }
+            'Estimators': [25, 50, 100, 150],
+            # 'Estimators': [100],
 
+            # 'Max depth': [5, 10, 15]
+            'Max depth': [10]
+        }
         mlp_trainers = []
         param_dict = {}
 

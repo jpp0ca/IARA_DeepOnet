@@ -254,17 +254,14 @@ class Manager():
 
         model_base_dir = self.get_model_base_dir(i_fold)
 
-        for _ in tqdm.tqdm(range(1), leave=False, bar_format = "{desc}",
-                        desc=f'Trn({str(trn_dataset)}) Val({str(val_dataset)})'):
+        for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
+                        tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers", ncols=120):
 
-            for trainer in self.trainer_list if (len(self.trainer_list) == 1) else \
-                            tqdm.tqdm(self.trainer_list, leave=False, desc="Trainers", ncols=120):
+            iara.utils.set_seed()
 
-                iara.utils.set_seed()
-
-                trainer.fit(model_base_dir=model_base_dir,
-                        trn_dataset=trn_dataset,
-                        val_dataset=val_dataset)
+            trainer.fit(model_base_dir=model_base_dir,
+                    trn_dataset=trn_dataset,
+                    val_dataset=val_dataset)
 
     def is_evaluated(self,
             eval_subset: iara_trainer.Subset,
