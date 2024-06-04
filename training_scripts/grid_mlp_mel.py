@@ -52,14 +52,14 @@ def main(override: bool,
                     input_type = iara_default.default_window_input())
 
     grid_search = {
-        # 'Neurons': [4, 16, 64, 128, 256, 1024],
-        'Neurons': [128],
+        'Neurons': [4, 16, 64, 128, 256, 1024],
+        # 'Neurons': [128],
 
         'Activation': ['Tanh', 'ReLU', 'PReLU'],
-        # 'Activation': ['ReLU'],
+        # 'Activation': ['Tanh'],
 
-        # 'Weight decay': [0, 1e-3, 1e-5]
-        'Weight decay': [1e-3]
+        'Weight decay': [0, 1e-3, 1e-5]
+        # 'Weight decay': [0]
     }
 
     activation_dict = {
@@ -98,11 +98,16 @@ def main(override: bool,
 
     manager = iara_exp.Manager(config, *mlp_trainers)
 
-    manager.run(folds = folds, override = override)
-
-    result_dict = manager.run(folds = folds, override = override)
+    result_dict = {}
+    # result_dict = manager.run(folds = folds, override = override)
 
     for (eval_subset, eval_strategy), grid in result_grid.items():
+
+        result_dict[eval_subset, eval_strategy] = manager.compile_existing_results(
+                        eval_subset = eval_subset,
+                        eval_strategy = eval_strategy,
+                        trainer_list = mlp_trainers,
+                        folds = folds)
 
         for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
 

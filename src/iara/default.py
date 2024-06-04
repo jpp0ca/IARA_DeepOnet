@@ -4,10 +4,16 @@ import typing
 import numpy as np
 import pandas as pd
 
+import torch
+
 import iara.records
 import iara.ml.dataset as iara_dataset
 import iara.processing.analysis as iara_proc
 import iara.processing.manager as iara_manager
+import iara.ml.models.trainer as iara_trn
+import iara.ml.models.cnn as iara_cnn
+import iara.ml.experiment as iara_exp
+import iara.ml.models.mlp as iara_mlp
 
 class Directories:
     """A structure for configuring directories for locating and storing files."""
@@ -85,10 +91,11 @@ def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTOR
         integration_interval=0.512
     )
 
-def default_collection(only_sample: bool = False):
+def default_collection(only_sample: bool = False,
+                       collection: iara.records.Collection = iara.records.Collection.OS):
     """Method to get default collection for iara."""
     return iara.records.CustomCollection(
-            collection = iara.records.Collection.OS,
+            collection = collection,
             target = iara.records.GenericTarget(
                 n_targets = 5,
                 function = Target.classify_row,
@@ -102,3 +109,83 @@ def default_window_input():
 
 def default_image_input():
     return iara_dataset.InputType.Image(n_windows=16, overlap=0.5)
+
+class Classifier(enum.Enum):
+    FOREST = 0
+    MLP = 1
+    CNN = 2
+
+
+def default_mel_managers(config_name: str,
+                         output_base_dir: str,
+                         classifiers: typing.List[Classifier],
+                         collection: iara.records.CustomCollection,
+                         data_processor: iara_manager.AudioFileProcessor,
+                         training_strategy: iara_trn.ModelTrainingStrategy = iara_trn.ModelTrainingStrategy.MULTICLASS):
+
+    manager_dict = {}
+
+    for classifier in classifiers:
+
+        if classifier == Classifier.CNN:
+
+            config = iara_exp.Config(
+                            name = f'{config_name}_image',
+                            dataset = collection,
+                            dataset_processor = data_processor,
+                            output_base_dir = output_base_dir,
+                            input_type = default_image_input())
+
+            trainer = iara_trn.OptimizerTrainer(
+                    training_strategy=training_strategy,
+                    trainer_id = 'cnn mel',
+                    n_targets = collection.target.get_n_targets(),
+                    model_allocator=lambda input_shape, n_targets:
+                            iara_cnn.CNN(
+                                input_shape=input_shape,
+                                conv_activation = torch.nn.ReLU(),
+                                conv_n_neurons = [16, 32, 64, 128],
+                                conv_pooling = torch.nn.AvgPool2d(2, 2),
+                                kernel_size = 3,
+                                classification_n_neurons = 64,
+                                n_targets = n_targets,
+                                dropout_prob = 0.4),
+                    optimizer_allocator=lambda model:
+                            torch.optim.Adam(model.parameters(), weight_decay=0),
+                    batch_size = 128)
+
+        else:
+
+            config = iara_exp.Config(
+                            name = f'{config_name}_window',
+                            dataset = collection,
+                            dataset_processor = data_processor,
+                            output_base_dir = output_base_dir,
+                            input_type = default_window_input())
+
+            if classifier == Classifier.FOREST:
+                trainer = iara_trn.RandomForestTrainer(
+                        training_strategy=training_strategy,
+                        trainer_id = 'forest mel',
+                        n_targets = collection.target.get_n_targets(),
+                        n_estimators = 100,
+                        max_depth = 10)
+
+            elif classifier == Classifier.MLP:
+
+                trainer = iara_trn.OptimizerTrainer(
+                        training_strategy=training_strategy,
+                        trainer_id = 'mlp mel',
+                        n_targets = collection.target.get_n_targets(),
+                        batch_size=1024,
+                        model_allocator=lambda input_shape, n_targets:
+                                iara_mlp.MLP(input_shape=input_shape,
+                                    n_neurons=128,
+                                    n_targets=n_targets,
+                                    activation_hidden_layer=torch.nn.Tanh()),
+                        optimizer_allocator=lambda model:
+                            torch.optim.Adam(model.parameters(), weight_decay=0))
+
+        manager_dict[classifier] = iara_exp.Manager(config, trainer)
+
+    return manager_dict

@@ -15,6 +15,7 @@ import numpy as np
 
 import torch
 
+
 def get_available_device() -> torch.device:
     """
     Get the available device for computation.

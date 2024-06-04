@@ -257,7 +257,8 @@ class BaseTrainer():
             eval_strategy: EvalStrategy,
             eval_base_dir: str,
             model_base_dir: typing.Optional[str] = None,
-            dataset: iara_dataset.BaseDataset = None) -> pd.DataFrame:
+            dataset: iara_dataset.BaseDataset = None,
+            complement_id: str = None) -> pd.DataFrame:
         """
         Abstract method to evaluate the model.
 
@@ -277,7 +278,7 @@ class BaseTrainer():
         with torch.no_grad():
 
             output_file = self.output_filename(model_base_dir=eval_base_dir,
-                                        complement=str(eval_subset),
+                                        complement=f'{str(eval_subset)}_{complement_id}' if complement_id is not None else str(eval_subset),
                                         extention='csv')
 
             if os.path.exists(output_file):

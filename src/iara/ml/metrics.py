@@ -315,10 +315,9 @@ class GridCompiler():
     This class compiles the results of grid search evaluations, including metric scores for each
     combination of parameters and each metric, and provides methods for formatting the results.
     """
-    default_metric_list = [Metric.BALANCED_ACCURACY,
-                           Metric.SP_INDEX,
-                           Metric.ACCURACY,
-                           Metric.DETECTION_PROBABILITY]
+    default_metric_list = [Metric.SP_INDEX,
+                           Metric.BALANCED_ACCURACY,
+                           Metric.MACRO_F1]
 
     def __init__(self,
                  metric_list: typing.List['Metric'] = default_metric_list,

@@ -23,6 +23,7 @@ import iara.ml.models.trainer as iara_trn
 import iara.ml.metrics as iara_metrics
 import iara.processing.analysis as iara_proc
 import iara.processing.manager as iara_manager
+import iara.utils
 
 import iara.default as iara_default
 from iara.default import DEFAULT_DIRECTORIES
@@ -50,9 +51,14 @@ def main(override: bool,
                     input_type = iara_default.default_window_input())
 
     grid_search = {
-        'Neurons': [4, 16, 64, 256, 1024],
-        'Activation': ['Tanh', 'ReLU', 'PReLU'],
-        'Weight decay': [0, 1e-3, 1e-5]
+        # 'Neurons': [4, 64, 256, 1024],
+        'Neurons': [128],
+
+        # 'Activation': ['Tanh', 'ReLU', 'PReLU'],
+        'Activation': ['Tanh'],
+
+        # 'Weight decay': [0, 1e-3, 1e-5]
+        'Weight decay': [0]
     }
 
     activation_dict = {
@@ -77,6 +83,7 @@ def main(override: bool,
                 training_strategy=training_strategy,
                 trainer_id = trainer_id,
                 n_targets = config.dataset.target.get_n_targets(),
+                batch_size=1024,
                 model_allocator=lambda input_shape, n_targets,
                     n_neurons=param_pack['Neurons'],
                     activation=activation_dict[param_pack['Activation']]:
