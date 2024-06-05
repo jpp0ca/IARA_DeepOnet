@@ -326,6 +326,10 @@ def main(classifier: Classifier,
             # result_grid[iara_trn.Subset.TEST, eval_strategy].export(f'{filename}.tex')
             result_grid[iara_trn.Subset.TEST, eval_strategy].export(f'{filename}.pkl')
 
+    params, cv = result_grid[iara_trn.Subset.TEST, iara_trn.EvalStrategy.BY_WINDOW].get_best()
+    print('########## Best Parameters ############')
+    print(params, " --- ", cv)
+
 
 if __name__ == "__main__":
     start_time = time.time()
