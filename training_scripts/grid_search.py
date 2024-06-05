@@ -35,11 +35,17 @@ class Classifier(enum.Enum):
 class GridSearch():
 
     def __init__(self) -> None:
-        self.headers = {
+        self.print_headers = {
             Classifier.FOREST: ['Estimators', 'Max depth'],
             Classifier.MLP: ['Neurons', 'Activation', 'Weight decay'],
             Classifier.CNN: ['conv_n_neurons', 'classification_n_neurons', 'Activation',
                              'Weight decay', 'conv_pooling', 'kernel', 'dropout']
+        }
+        self.headers = {
+            Classifier.FOREST: ['est', 'depth'],
+            Classifier.MLP: ['neurons', 'act', 'weight'],
+            Classifier.CNN: ['n_conv', 'n_mlp', 'act',
+                             'weight', 'pool', 'kern', 'drop']
         }
         self.complete_grid = {
             Classifier.FOREST: {
@@ -96,7 +102,7 @@ class GridSearch():
         c_arg, _ = arg_parser.parse_known_args()
 
         classifier = Classifier(classifier_choises.index(c_arg.classifier))
-        headers = self.headers[classifier]
+        headers = self.print_headers[classifier]
         grid_choices=list(range(len(headers)))
         help_str = 'Choose grid parameters to vary(Example: 0,4-7): ['
         for t in grid_choices:

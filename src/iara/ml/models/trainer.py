@@ -363,7 +363,6 @@ class BaseTrainer():
                                         complement=str(eval_subset),
                                         extention='csv')
 
-        print('output_file: ', output_file)
         return os.path.exists(output_file)
 
 class OptimizerTrainer(BaseTrainer):
