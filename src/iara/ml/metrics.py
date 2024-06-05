@@ -7,9 +7,11 @@ as well as for compiling and formatting evaluation results from cross-validation
 import enum
 import typing
 import math
+import pickle
 
 import numpy as np
 import pandas as pd
+import dill
 
 import sklearn.metrics as sk_metrics
 import scipy.stats as scipy
@@ -34,12 +36,12 @@ class Metric(enum.Enum):
     def as_label(self):
         """Return the human-readable label of the metric."""
         en_labels = {
-            __class__.ACCURACY: "ACCURACY",
-            __class__.BALANCED_ACCURACY: "BALANCED_ACCURACY",
-            __class__.MICRO_F1: "MICRO_F1",
-            __class__.MACRO_F1: "MACRO_F1",
+            __class__.ACCURACY: "ACC",
+            __class__.BALANCED_ACCURACY: "ACC",
+            __class__.MICRO_F1: "F1-score",
+            __class__.MACRO_F1: "F1-score",
             __class__.DETECTION_PROBABILITY: "DETECTION_PROBABILITY",
-            __class__.SP_INDEX: "SP_INDEX",
+            __class__.SP_INDEX: "SP",
         }
         return en_labels[self]
 
@@ -163,7 +165,7 @@ class CrossValidationCompiler():
 
     def add(self,
             i_fold: int,
-            metric_list: typing.List['Metric'],
+            metric_list: typing.List[Metric],
             target: typing.Iterable[int],
             prediction: typing.Iterable[int]) -> None:
         """Add evaluation results for a fold.
@@ -186,6 +188,9 @@ class CrossValidationCompiler():
 
         self._score_dict['abs_cm'][i_fold] = sk_metrics.confusion_matrix(target, prediction)
         self._score_dict['rel_cm'][i_fold] = sk_metrics.confusion_matrix(target, prediction, normalize='true')
+
+    def get(self, metric: Metric):
+        return self._score_dict[str(metric)]
 
     def print_abs_cm(self):
         result = ""
@@ -252,8 +257,7 @@ class CrossValidationCompiler():
         """
         decimal_places = int(math.log10(math.sqrt(n_samples))+1)
         if tex_format:
-            return f'${np.mean(values):.{decimal_places}f} \\pm \
-                {np.std(values):.{decimal_places}f}$'
+            return f'${np.mean(values):.{decimal_places}f} \\pm {np.std(values):.{decimal_places}f}$'
 
         return f'{np.mean(values):.{decimal_places}f} \u00B1 {np.std(values):.{decimal_places}f}'
 
@@ -306,7 +310,10 @@ class CrossValidationCompiler():
         return ret
 
     def __str__(self) -> str:
-        return self.as_str()
+        ret = ''
+        for i, metric in enumerate(self._score_dict['metrics']):
+            ret = f'{ret}{metric}[{self.metric_as_str(metric)}], '
+        return ret[:-2]
 
 
 class GridCompiler():
@@ -320,7 +327,7 @@ class GridCompiler():
                            Metric.MACRO_F1]
 
     def __init__(self,
-                 metric_list: typing.List['Metric'] = default_metric_list,
+                 metric_list: typing.List[Metric] = default_metric_list,
                  comparison_test: Test = None):
         self.cv_dict = {}
         self.param_dict = {}
@@ -356,6 +363,83 @@ class GridCompiler():
                                 metric_list = self.metric_list,
                                 target = target,
                                 prediction = prediction)
+
+    def add_cv(self,
+            params: typing.Dict,
+            cv: CrossValidationCompiler):
+        params_hash = hash(tuple(params.items()))
+        self.params = params.keys()
+
+        if not params_hash in self.cv_dict:
+            self.param_dict[params_hash] = params
+
+        self.cv_dict[params_hash]  = {
+            'params': params,
+            'cv': cv,
+        }
+
+
+    def to_df(self, tex_format=False) -> pd.DataFrame:
+
+        headers = list(self.params)
+        for metric in self.metric_list:
+            headers.append(metric.as_label())
+
+        df = pd.DataFrame(columns=headers)
+
+        for _, cv_dict in self.cv_dict.items():
+            
+            line = []
+
+            for _, param_value in cv_dict['params'].items():
+                line.append(str(param_value))
+
+            for metric in self.metric_list:
+                line.append(cv_dict['cv'].metric_as_str(metric, tex_format=tex_format))
+
+            df.loc[len(df)] = line
+
+        return df
+    
+    def get_metric_list(self, params: typing.Dict, metric: Metric):
+        params_hash = hash(tuple(params.items()))
+        return self.cv_dict[params_hash]['cv'].get(metric)
+    
+    def get_best(self, metric: Metric = Metric.SP_INDEX):
+
+        best_cv = None
+        best_mean = 0
+
+        for _, cv_dict in self.cv_dict.items():
+            mean = np.mean(cv_dict['cv'].get(metric))
+            if best_mean < mean:
+                best_mean = mean
+                best_cv = cv_dict
+
+        return best_cv['params'], best_cv['cv']
+
+    def export(self, filename):
+        file_extension = filename.split('.')[-1]
+
+        if file_extension == "csv":
+            df = self.to_df()
+            df.to_csv(filename, index=False)
+
+        elif file_extension == "tex":
+            df = self.to_df()
+            df.to_latex(filename, index=False)
+
+        elif file_extension == "pkl":
+            with open(filename, 'wb') as f:
+                dill.dump(self, f)
+
+        else:
+            raise NotImplementedError(f'File extension not suported {file_extension}')
+
+    @staticmethod
+    def load(filename: str) -> 'GridCompiler':
+        with open(filename, 'rb') as f:
+            return dill.load(f)
 
     def as_table(self, tex_format=False) -> typing.List[typing.List[str]]:
         """

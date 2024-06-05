@@ -393,28 +393,42 @@ class Manager():
         self.__prepare_output_dir(override=override)
         id_list = self.config.split_datasets()
 
-        self.print_dataset_details(id_list)
+        # self.print_dataset_details(id_list)
 
-        for _ in tqdm.tqdm(range(1), leave=False,
-                           desc="--- Fitting models ---", bar_format = "{desc}"):
-            for i_fold in folds if len(folds) == 1 else \
-                                    tqdm.tqdm(folds,
-                                              leave=False,
-                                              desc="Fold",
-                                              ncols=120):
-                (trn_set, val_set, test_set) = id_list[i_fold]
+        for i_fold in folds if len(folds) == 1 else \
+                                tqdm.tqdm(folds,
+                                            leave=False,
+                                            desc="Fold",
+                                            ncols=120):
+            (trn_set, val_set, test_set) = id_list[i_fold]
+
+
+            for _ in tqdm.tqdm(range(1),
+                               leave=False,
+                                desc="--- Fitting ---",
+                                bar_format = "{desc}"):
 
                 self.fit(i_fold=i_fold,
                         trn_dataset_ids=trn_set['ID'].to_list(),
                         val_dataset_ids=val_set['ID'].to_list())
 
-                id_set = {
-                    iara_trainer.Subset.TRN: trn_set,
-                    iara_trainer.Subset.VAL: val_set,
-                    iara_trainer.Subset.TEST: test_set,
-                }
+            id_set = {
+                iara_trainer.Subset.TRN: trn_set,
+                iara_trainer.Subset.VAL: val_set,
+                iara_trainer.Subset.TEST: test_set,
+            }
 
-                for eval_subset, eval_strategy in itertools.product(iara_trainer.Subset, iara_trainer.EvalStrategy):
+            for _ in tqdm.tqdm(range(1),
+                               leave=False,
+                                desc="--- Evaluating ---",
+                                bar_format = "{desc}"):
+
+                for eval_subset, eval_strategy in \
+                        tqdm.tqdm(itertools.product(iara_trainer.Subset, iara_trainer.EvalStrategy),
+                                leave=False,
+                                desc="Subsets",
+                                ncols=120):
+
                     self.eval(i_fold=i_fold,
                                 eval_subset=eval_subset,
                                 eval_strategy=eval_strategy,
@@ -422,8 +436,12 @@ class Manager():
 
 
         eval_dict = {}
+        for eval_subset, eval_strategy in \
+                tqdm.tqdm(itertools.product(iara_trainer.Subset, iara_trainer.EvalStrategy),
+                        leave=False,
+                        desc="Compiling results",
+                        ncols=120):
 
-        for eval_subset, eval_strategy in itertools.product(iara_trainer.Subset, iara_trainer.EvalStrategy):
             eval_dict[(eval_subset, eval_strategy)] = \
                     self.compile_results(eval_subset=eval_subset,
                                         eval_strategy=eval_strategy,

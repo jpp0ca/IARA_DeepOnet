@@ -4,6 +4,8 @@ import time
 import sys
 import typing
 import itertools
+import tqdm
+import os
 
 import torch
 
@@ -53,7 +55,7 @@ class GridSearch():
                 self.headers[Classifier.FOREST][1]: [5, 10, 15, 20]
             },
             Classifier.MLP: {
-                self.headers[Classifier.FOREST][0]: [4, 16, 64, 128, 256, 1024],
+                self.headers[Classifier.MLP][0]: [4, 16, 64, 128, 256, 1024],
                 self.headers[Classifier.MLP][1]: ['Tanh', 'ReLU', 'PReLU'],
                 self.headers[Classifier.MLP][2]: [0, 1e-3, 1e-5]
             },
@@ -76,13 +78,13 @@ class GridSearch():
                 self.headers[Classifier.FOREST][1]: [10]
             },
             Classifier.MLP: {
-                self.headers[Classifier.FOREST][0]: [128],
+                self.headers[Classifier.MLP][0]: [128],
                 self.headers[Classifier.MLP][1]: ['Tanh'],
                 self.headers[Classifier.MLP][2]: [0]
             },
             Classifier.CNN: {
                 self.headers[Classifier.CNN][0]: ['16, 32, 64, 128'],
-                self.headers[Classifier.CNN][1]: [64],
+                self.headers[Classifier.CNN][1]: [128],
                 self.headers[Classifier.CNN][2]: ['ReLU'],
                 self.headers[Classifier.CNN][3]: [0],
                 self.headers[Classifier.CNN][4]: ['Avg'],
@@ -90,7 +92,6 @@ class GridSearch():
                 self.headers[Classifier.CNN][6]: [0.4]
             }
         }
-        self.mels = [16, 32, 64, 128, 256]
 
     def add_grid_opt(self, arg_parser: argparse.ArgumentParser):
 
@@ -259,6 +260,7 @@ def main(classifier: Classifier,
          override: bool):
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
+    output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
 
     result_grid = {}
     for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
@@ -267,9 +269,8 @@ def main(classifier: Classifier,
     grid_search = GridSearch()
     feature_dict_list = feature.get_feature_loop(classifier, training_strategy)
 
-    for config_name, feature_id, dp in feature_dict_list:
-
-        output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
+    for config_name, feature_id, dp in feature_dict_list if len(feature_dict_list) == 1 else \
+                tqdm.tqdm(feature_dict_list, leave=False, desc="Features", ncols=120):
 
         config = iara_exp.Config(
                 name = config_name,
@@ -297,8 +298,6 @@ def main(classifier: Classifier,
                         eval_strategy = eval_strategy,
                         folds = folds)
 
-            print('result_dict ', result_dict)
-
             for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
 
                 for i_fold, result in enumerate(results):
@@ -316,6 +315,17 @@ def main(classifier: Classifier,
     for dataset_id, grid_compiler in result_grid.items():
         print(f'########## {dataset_id} ############')
         print(grid_compiler)
+
+    if only_eval:
+        compiled_dir = f'{output_base_dir}/compiled'
+        os.makedirs(compiled_dir, exist_ok=True)
+
+        for eval_strategy in iara_trn.EvalStrategy:
+            filename = f'{compiled_dir}/{classifier}_{feature}_{training_strategy}_{eval_strategy}'
+            result_grid[iara_trn.Subset.TEST, eval_strategy].export(f'{filename}.csv')
+            # result_grid[iara_trn.Subset.TEST, eval_strategy].export(f'{filename}.tex')
+            result_grid[iara_trn.Subset.TEST, eval_strategy].export(f'{filename}.pkl')
+
 
 if __name__ == "__main__":
     start_time = time.time()
