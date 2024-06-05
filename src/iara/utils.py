@@ -7,6 +7,7 @@ import math
 import random
 import os
 import datetime
+import typing
 
 import shutil
 import psutil
@@ -101,3 +102,18 @@ def str_format_time(n_seconds: float) -> str:
 
     hours = n_seconds / 3600
     return f"{hours:.2f} hours"
+
+def str_to_list(arg: str, default_list: typing.List[int]) -> typing.List[int]:
+
+    ret_list = []
+    if arg is not None:
+        fold_ranges = arg.split(',')
+        for fold_range in fold_ranges:
+            if '-' in fold_range:
+                start, end = map(int, fold_range.split('-'))
+                ret_list.extend(range(start, end + 1))
+            else:
+                ret_list.append(int(fold_range))
+    else:
+        ret_list = default_list
+    return ret_list

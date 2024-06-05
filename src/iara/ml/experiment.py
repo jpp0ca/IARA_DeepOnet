@@ -393,9 +393,6 @@ class Manager():
         self.__prepare_output_dir(override=override)
         id_list = self.config.split_datasets()
 
-        if folds is None or len(folds) == 0:
-            folds = range(len(id_list))
-
         self.print_dataset_details(id_list)
 
         for _ in tqdm.tqdm(range(1), leave=False,
@@ -455,9 +452,6 @@ class CrossComparator():
                                     ncols=120):
 
             id_list = self.manager_b.config.split_datasets()
-
-            if folds is None or len(folds) == 0:
-                folds = range(len(id_list))
 
             for i_fold in folds if len(folds) == 1 else tqdm.tqdm(folds,
                                                                     leave=False,
