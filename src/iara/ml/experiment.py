@@ -336,6 +336,7 @@ class Manager():
                         eval_subset: iara_trainer.Subset,
                         eval_strategy: iara_trainer.EvalStrategy,
                         trainer_list: typing.List[iara_trainer.BaseTrainer] = None,
+                        only_eval_completed: bool = False,
                         folds: typing.List[int] = None) -> typing.List[pd.DataFrame]:
 
         result_dict = {}
@@ -343,10 +344,7 @@ class Manager():
         for trainer in trainer_list if trainer_list is not None else self.trainer_list:
 
             results = []
-            for i_fold in range(self.config.get_n_folds()):
-
-                if folds and i_fold not in folds:
-                    continue
+            for i_fold in folds:
 
                 eval_base_dir = os.path.join(self.config.output_base_dir,
                                                 'eval',
@@ -359,6 +357,9 @@ class Manager():
                 results.append(trainer.eval(eval_subset=eval_subset,
                                             eval_strategy=eval_strategy,
                                             eval_base_dir=eval_base_dir))
+
+            if (len(results) != len(folds)) and only_eval_completed:
+                continue
 
             result_dict[trainer.trainer_id] = results
 

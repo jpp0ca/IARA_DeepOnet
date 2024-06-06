@@ -80,7 +80,7 @@ class GridSearch():
                 },
                 Classifier.MLP: {
                     self.headers[Classifier.MLP][0]: [128],
-                    self.headers[Classifier.MLP][1]: ['Tanh'],
+                    self.headers[Classifier.MLP][1]: ['PReLU'],
                     self.headers[Classifier.MLP][2]: [0]
                 },
                 Classifier.CNN: {
@@ -107,7 +107,7 @@ class GridSearch():
                     self.headers[Classifier.CNN][0]: ['16, 32, 64, 128'],
                     self.headers[Classifier.CNN][1]: [128],
                     self.headers[Classifier.CNN][2]: ['ReLU'],
-                    self.headers[Classifier.CNN][3]: [1e-3],
+                    self.headers[Classifier.CNN][3]: [0],
                     self.headers[Classifier.CNN][4]: ['Avg'],
                     self.headers[Classifier.CNN][5]: [3],
                     self.headers[Classifier.CNN][6]: [0.4]
@@ -281,8 +281,12 @@ def main(classifier: Classifier,
          training_strategy: iara_trn.ModelTrainingStrategy,
          folds: typing.List[int],
          only_eval: bool,
+         only_eval_completed: bool,
          only_sample: bool,
          override: bool):
+    
+    if only_eval_completed:
+        only_eval = True
 
     grid_str = 'grid_search' if not only_sample else 'grid_search_sample'
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
@@ -322,6 +326,7 @@ def main(classifier: Classifier,
                 result_dict[eval_subset, eval_strategy] = manager.compile_existing_results(
                         eval_subset = eval_subset,
                         eval_strategy = eval_strategy,
+                        only_eval_completed = only_eval_completed,
                         folds = folds)
 
             for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
@@ -374,6 +379,8 @@ if __name__ == "__main__":
                         help='Specify folds to be executed. Example: 0,4-7')
     parser.add_argument('--only_eval', action='store_true', default=False,
                         help='Not training, only evaluate trained models')
+    parser.add_argument('--only_eval_completed', action='store_true', default=False,
+                        help='Not training, only evaluate trained models')
     parser.add_argument('--only_sample', action='store_true', default=False,
                         help='Execute only in sample_dataset. For quick training and test.')
     parser.add_argument('--override', action='store_true', default=False,
@@ -407,6 +414,7 @@ if __name__ == "__main__":
             folds = folds_to_execute,
             training_strategy = strategy,
             only_eval = args.only_eval,
+            only_eval_completed = args.only_eval_completed,
             only_sample = args.only_sample,
             override = args.override)
 

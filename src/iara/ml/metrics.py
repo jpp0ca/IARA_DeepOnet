@@ -335,6 +335,9 @@ class GridCompiler():
         self.metric_list = metric_list
         self.comparison_test = comparison_test
 
+    def is_empty(self) -> bool:
+        return self.params == None
+
     def add(self,
             params: typing.Dict,
             i_fold: int,
@@ -378,8 +381,10 @@ class GridCompiler():
             'cv': cv,
         }
 
-
     def to_df(self, tex_format=False) -> pd.DataFrame:
+
+        if self.is_empty():
+            return pd.DataFrame()
 
         headers = list(self.params)
         for metric in self.metric_list:
@@ -406,6 +411,8 @@ class GridCompiler():
         return self.cv_dict[params_hash]['cv'].get(metric)
     
     def get_best(self, metric: Metric = Metric.SP_INDEX):
+        if self.is_empty():
+            return [], []
 
         best_cv = None
         best_mean = 0
@@ -419,6 +426,10 @@ class GridCompiler():
         return best_cv['params'], best_cv['cv']
 
     def export(self, filename):
+        if self.is_empty():
+            print('Grid not exported - empty grid')
+            return
+
         file_extension = filename.split('.')[-1]
 
         if file_extension == "csv":
@@ -442,6 +453,9 @@ class GridCompiler():
             return dill.load(f)
 
     def as_table(self, tex_format=False) -> typing.List[typing.List[str]]:
+        if self.is_empty():
+            return 'Empty grid'
+
         """
         Get the compiled results as a formatted table.
 
@@ -479,6 +493,8 @@ class GridCompiler():
         return table
 
     def as_str(self, tex_format=False):
+        if self.is_empty():
+            return 'Empty grid'
         """
         Get the compiled results as a formatted string.
 
@@ -493,6 +509,9 @@ class GridCompiler():
         )
 
     def print_cm(self):
+        if self.is_empty():
+            return 'Empty grid'
+
         ret = '------- Confusion Matrix -------------\n'
 
         for hash, dict in self.cv_dict.items():
@@ -505,8 +524,9 @@ class GridCompiler():
 
     def __str__(self) -> str:
 
-        
+        if self.is_empty():
+            return 'Empty grid'
+
         ret = '------- Metric Table -------------\n'
         ret += self.as_str()
-
         return ret
