@@ -73,23 +73,45 @@ class GridSearch():
             }
         }
         self.small_grid = {
-            Classifier.FOREST: {
-                self.headers[Classifier.FOREST][0]: [200],
-                self.headers[Classifier.FOREST][1]: [10]
+            Feature.MEL: {
+                Classifier.FOREST: {
+                    self.headers[Classifier.FOREST][0]: [200],
+                    self.headers[Classifier.FOREST][1]: [10]
+                },
+                Classifier.MLP: {
+                    self.headers[Classifier.MLP][0]: [128],
+                    self.headers[Classifier.MLP][1]: ['Tanh'],
+                    self.headers[Classifier.MLP][2]: [0]
+                },
+                Classifier.CNN: {
+                    self.headers[Classifier.CNN][0]: ['16, 32, 64, 128'],
+                    self.headers[Classifier.CNN][1]: [128],
+                    self.headers[Classifier.CNN][2]: ['PReLU'],
+                    self.headers[Classifier.CNN][3]: [1e-3],
+                    self.headers[Classifier.CNN][4]: ['Avg'],
+                    self.headers[Classifier.CNN][5]: [3],
+                    self.headers[Classifier.CNN][6]: [0.4]
+                }
             },
-            Classifier.MLP: {
-                self.headers[Classifier.MLP][0]: [128],
-                self.headers[Classifier.MLP][1]: ['Tanh'],
-                self.headers[Classifier.MLP][2]: [0]
-            },
-            Classifier.CNN: {
-                self.headers[Classifier.CNN][0]: ['16, 32, 64, 128'],
-                self.headers[Classifier.CNN][1]: [128],
-                self.headers[Classifier.CNN][2]: ['ReLU'],
-                self.headers[Classifier.CNN][3]: [0],
-                self.headers[Classifier.CNN][4]: ['Avg'],
-                self.headers[Classifier.CNN][5]: [3],
-                self.headers[Classifier.CNN][6]: [0.4]
+            Feature.LOFAR: {
+                Classifier.FOREST: {
+                    self.headers[Classifier.FOREST][0]: [200],
+                    self.headers[Classifier.FOREST][1]: [10]
+                },
+                Classifier.MLP: {
+                    self.headers[Classifier.MLP][0]: [128],
+                    self.headers[Classifier.MLP][1]: ['Tanh'],
+                    self.headers[Classifier.MLP][2]: [0]
+                },
+                Classifier.CNN: {
+                    self.headers[Classifier.CNN][0]: ['16, 32, 64, 128'],
+                    self.headers[Classifier.CNN][1]: [128],
+                    self.headers[Classifier.CNN][2]: ['ReLU'],
+                    self.headers[Classifier.CNN][3]: [1e-3],
+                    self.headers[Classifier.CNN][4]: ['Avg'],
+                    self.headers[Classifier.CNN][5]: [3],
+                    self.headers[Classifier.CNN][6]: [0.4]
+                }
             }
         }
 
@@ -118,16 +140,19 @@ class GridSearch():
     def get_manager(self,
                     config: iara_exp.Config,
                     classifier: Classifier,
+                    feature,
                     training_strategy: iara_trn.ModelTrainingStrategy,
                     grids_index: typing.List[int],
                     only_eval: bool) -> typing.Tuple[iara_exp.Manager, typing.Dict]:
+
+        feature = Feature.MEL if feature == Feature.MEL_GRID else feature
 
         grid_search = {}
         for i, header in enumerate(self.headers[classifier]):
             if i in grids_index or only_eval:
                 grid_search[header] = self.complete_grid[classifier][header]
             else:
-                grid_search[header] = self.small_grid[classifier][header]
+                grid_search[header] = self.small_grid[feature][classifier][header]
 
         trainers = []
         param_dict = {}
@@ -281,6 +306,7 @@ def main(classifier: Classifier,
 
         manager, param_dict = grid_search.get_manager(config = config,
                                           classifier = classifier,
+                                          feature=feature,
                                           training_strategy = training_strategy,
                                           grids_index = grids_index,
                                           only_eval = only_eval)
