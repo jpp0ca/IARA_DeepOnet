@@ -134,9 +134,16 @@ class Test(enum.Enum):
         p_mean = (p_1 + p_2)/2
         s_2 = (p_1 - p_mean)**2 + (p_2 - p_mean)**2
 
-        f = (np.sum(sample1**2) + np.sum(sample2**2)) / (2*np.sum(s_2))
+        N = (np.sum(p_1**2) + np.sum(p_2**2))
 
-        return f > f.ppf(confidence_level, 10, 5)
+        if N == 0:
+            return False, 0
+
+        f = N / (2*np.sum(s_2))
+
+        confidence = scipy.f.cdf(f, 10, 5)
+
+        return f > scipy.f.ppf(confidence_level, 10, 5), confidence
 
     def reject_equal_hipoteses(self, sample1: typing.Iterable, sample2: typing.Iterable, confidence_level = 0.95) -> bool: #return true se diferente
         return getattr(self.__class__, self.name.lower())(sample1, sample2, confidence_level)
