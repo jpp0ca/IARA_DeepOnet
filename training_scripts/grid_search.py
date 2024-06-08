@@ -20,111 +20,97 @@ import iara.processing.manager as iara_manager
 
 from iara.default import DEFAULT_DIRECTORIES
 
-class Classifier(enum.Enum):
-    FOREST = 0
-    MLP = 1
-    CNN = 2
-
-    def __str__(self) -> str:
-        return str(self.name).rsplit(".", maxsplit=1)[-1].lower()
-
-    def get_input_type(self):
-        if self == Classifier.CNN:
-            return iara_default.default_image_input()
-
-        return iara_default.default_window_input()
-
 class GridSearch():
 
     def __init__(self) -> None:
         self.print_headers = {
-            Classifier.FOREST: ['Estimators', 'Max depth'],
-            Classifier.MLP: ['Neurons', 'Activation', 'Weight decay'],
-            Classifier.CNN: ['conv_n_neurons', 'classification_n_neurons', 'Activation',
+            iara_default.Classifier.FOREST: ['Estimators', 'Max depth'],
+            iara_default.Classifier.MLP: ['Neurons', 'Activation', 'Weight decay'],
+            iara_default.Classifier.CNN: ['conv_n_neurons', 'classification_n_neurons', 'Activation',
                              'Weight decay', 'conv_pooling', 'kernel', 'dropout']
         }
         self.headers = {
-            Classifier.FOREST: ['est', 'depth'],
-            Classifier.MLP: ['neurons', 'act', 'weight'],
-            Classifier.CNN: ['n_conv', 'n_mlp', 'act',
+            iara_default.Classifier.FOREST: ['est', 'depth'],
+            iara_default.Classifier.MLP: ['neurons', 'act', 'weight'],
+            iara_default.Classifier.CNN: ['n_conv', 'n_mlp', 'act',
                              'weight', 'pool', 'kern', 'drop']
         }
         self.complete_grid = {
-            Classifier.FOREST: {
-                self.headers[Classifier.FOREST][0]: [25, 50, 100, 150, 200, 250],
-                self.headers[Classifier.FOREST][1]: [5, 10, 15, 20]
+            iara_default.Classifier.FOREST: {
+                self.headers[iara_default.Classifier.FOREST][0]: [25, 50, 100, 150, 200, 250],
+                self.headers[iara_default.Classifier.FOREST][1]: [5, 10, 15, 20]
             },
-            Classifier.MLP: {
-                self.headers[Classifier.MLP][0]: [4, 16, 64, 128, 256, 1024],
-                self.headers[Classifier.MLP][1]: ['Tanh', 'ReLU', 'PReLU'],
-                self.headers[Classifier.MLP][2]: [0, 1e-3, 1e-5]
+            iara_default.Classifier.MLP: {
+                self.headers[iara_default.Classifier.MLP][0]: [64, 128, 256, 1024],
+                self.headers[iara_default.Classifier.MLP][1]: ['Tanh', 'ReLU', 'PReLU'],
+                self.headers[iara_default.Classifier.MLP][2]: [0, 1e-3, 1e-5]
             },
-            Classifier.CNN: {
-                self.headers[Classifier.CNN][0]: ['16, 32',
+            iara_default.Classifier.CNN: {
+                self.headers[iara_default.Classifier.CNN][0]: ['16, 32',
                                                   '16, 32, 64',
                                                   '16, 32, 64, 128',
                                                   '32, 64, 128, 256'],
-                self.headers[Classifier.CNN][1]: [16, 32, 64, 128, 256, 512, 1024],
-                self.headers[Classifier.CNN][2]: ['ReLU', 'PReLU', 'LeakyReLU'],
-                self.headers[Classifier.CNN][3]: [0, 1e-3, 1e-5],
-                self.headers[Classifier.CNN][4]: ['Max', 'Avg'],
-                self.headers[Classifier.CNN][5]: [3, 5, 7],
-                self.headers[Classifier.CNN][6]: [0.2, 0.4, 0.6]
+                self.headers[iara_default.Classifier.CNN][1]: [16, 32, 64, 128, 256, 512, 1024],
+                self.headers[iara_default.Classifier.CNN][2]: ['ReLU', 'PReLU', 'LeakyReLU'],
+                self.headers[iara_default.Classifier.CNN][3]: [0, 1e-3, 1e-5],
+                self.headers[iara_default.Classifier.CNN][4]: ['Max', 'Avg'],
+                self.headers[iara_default.Classifier.CNN][5]: [3, 5, 7],
+                self.headers[iara_default.Classifier.CNN][6]: [0.2, 0.4, 0.6]
             }
         }
         self.small_grid = {
             Feature.MEL: {
-                Classifier.FOREST: {
-                    self.headers[Classifier.FOREST][0]: [200],
-                    self.headers[Classifier.FOREST][1]: [10]
+                iara_default.Classifier.FOREST: {
+                    self.headers[iara_default.Classifier.FOREST][0]: [200],
+                    self.headers[iara_default.Classifier.FOREST][1]: [10]
                 },
-                Classifier.MLP: {
-                    self.headers[Classifier.MLP][0]: [128],
-                    self.headers[Classifier.MLP][1]: ['PReLU'],
-                    self.headers[Classifier.MLP][2]: [0]
+                iara_default.Classifier.MLP: {
+                    self.headers[iara_default.Classifier.MLP][0]: [128],
+                    self.headers[iara_default.Classifier.MLP][1]: ['PReLU'],
+                    self.headers[iara_default.Classifier.MLP][2]: [0]
                 },
-                Classifier.CNN: {
-                    self.headers[Classifier.CNN][0]: ['16, 32, 64, 128'],
-                    self.headers[Classifier.CNN][1]: [128],
-                    self.headers[Classifier.CNN][2]: ['PReLU'],
-                    self.headers[Classifier.CNN][3]: [1e-3],
-                    self.headers[Classifier.CNN][4]: ['Avg'],
-                    self.headers[Classifier.CNN][5]: [3],
-                    self.headers[Classifier.CNN][6]: [0.4]
+                iara_default.Classifier.CNN: {
+                    self.headers[iara_default.Classifier.CNN][0]: ['16, 32, 64, 128'],
+                    self.headers[iara_default.Classifier.CNN][1]: [128],
+                    self.headers[iara_default.Classifier.CNN][2]: ['PReLU'],
+                    self.headers[iara_default.Classifier.CNN][3]: [1e-3],
+                    self.headers[iara_default.Classifier.CNN][4]: ['Avg'],
+                    self.headers[iara_default.Classifier.CNN][5]: [3],
+                    self.headers[iara_default.Classifier.CNN][6]: [0.4]
                 }
             },
             Feature.LOFAR: {
-                Classifier.FOREST: {
-                    self.headers[Classifier.FOREST][0]: [200],
-                    self.headers[Classifier.FOREST][1]: [10]
+                iara_default.Classifier.FOREST: {
+                    self.headers[iara_default.Classifier.FOREST][0]: [200],
+                    self.headers[iara_default.Classifier.FOREST][1]: [10]
                 },
-                Classifier.MLP: {
-                    self.headers[Classifier.MLP][0]: [128],
-                    self.headers[Classifier.MLP][1]: ['Tanh'],
-                    self.headers[Classifier.MLP][2]: [0]
+                iara_default.Classifier.MLP: {
+                    self.headers[iara_default.Classifier.MLP][0]: [128],
+                    self.headers[iara_default.Classifier.MLP][1]: ['Tanh'],
+                    self.headers[iara_default.Classifier.MLP][2]: [0]
                 },
-                Classifier.CNN: {
-                    self.headers[Classifier.CNN][0]: ['16, 32, 64, 128'],
-                    self.headers[Classifier.CNN][1]: [128],
-                    self.headers[Classifier.CNN][2]: ['ReLU'],
-                    self.headers[Classifier.CNN][3]: [0],
-                    self.headers[Classifier.CNN][4]: ['Avg'],
-                    self.headers[Classifier.CNN][5]: [3],
-                    self.headers[Classifier.CNN][6]: [0.4]
+                iara_default.Classifier.CNN: {
+                    self.headers[iara_default.Classifier.CNN][0]: ['16, 32, 64, 128'],
+                    self.headers[iara_default.Classifier.CNN][1]: [128],
+                    self.headers[iara_default.Classifier.CNN][2]: ['ReLU'],
+                    self.headers[iara_default.Classifier.CNN][3]: [0],
+                    self.headers[iara_default.Classifier.CNN][4]: ['Avg'],
+                    self.headers[iara_default.Classifier.CNN][5]: [3],
+                    self.headers[iara_default.Classifier.CNN][6]: [0.4]
                 }
             }
         }
 
     def add_grid_opt(self, arg_parser: argparse.ArgumentParser):
 
-        classifier_choises = [str(c) for c in Classifier]
+        classifier_choises = [str(c) for c in iara_default.Classifier]
 
         arg_parser.add_argument('-c', '--classifier', type=str, choices=classifier_choises,
                             required=True, default='', help='classifier to execute grid')
 
         c_arg, _ = arg_parser.parse_known_args()
 
-        classifier = Classifier(classifier_choises.index(c_arg.classifier))
+        classifier = iara_default.Classifier(classifier_choises.index(c_arg.classifier))
         headers = self.print_headers[classifier]
         grid_choices=list(range(len(headers)))
         help_str = 'Choose grid parameters to vary(Example: 0,4-7): ['
@@ -139,7 +125,7 @@ class GridSearch():
 
     def get_manager(self,
                     config: iara_exp.Config,
-                    classifier: Classifier,
+                    classifier: iara_default.Classifier,
                     feature,
                     training_strategy: iara_trn.ModelTrainingStrategy,
                     grids_index: typing.List[int],
@@ -179,7 +165,7 @@ class GridSearch():
             trainer_id = trainer_id[1:]
             param_dict[trainer_id] = param_pack
 
-            if classifier == Classifier.FOREST:
+            if classifier == iara_default.Classifier.FOREST:
 
                 trainers.append(iara_trn.RandomForestTrainer(
                         training_strategy = training_strategy,
@@ -188,7 +174,7 @@ class GridSearch():
                         n_estimators = param_pack[self.headers[classifier][0]],
                         max_depth = param_pack[self.headers[classifier][1]]))
 
-            elif classifier == Classifier.MLP:
+            elif classifier == iara_default.Classifier.MLP:
 
                 trainers.append(iara_trn.OptimizerTrainer(
                         training_strategy=training_strategy,
@@ -207,7 +193,7 @@ class GridSearch():
                                 torch.optim.Adam(model.parameters(),
                                     weight_decay=weight_decay)))
 
-            elif classifier == Classifier.CNN:
+            elif classifier == iara_default.Classifier.CNN:
 
                 conv_n_neurons = [int(x.strip()) for x in param_pack[self.headers[classifier][0]].split(',')]
 
@@ -251,7 +237,7 @@ class Feature(enum.Enum):
     def __str__(self) -> str:
         return str(self.name).rsplit(".", maxsplit=1)[-1].lower()
 
-    def get_feature_loop(self, classifiers: Classifier,
+    def get_feature_loop(self, classifiers: iara_default.Classifier,
                          training_strategy: iara_trn.ModelTrainingStrategy) \
         -> typing.List[typing.Tuple[str, str, iara_manager.AudioFileProcessor]]:
 
@@ -275,7 +261,7 @@ class Feature(enum.Enum):
         return loop
 
 
-def main(classifier: Classifier,
+def main(classifier: iara_default.Classifier,
          feature: Feature,
          grids_index: typing.List[int],
          training_strategy: iara_trn.ModelTrainingStrategy,

@@ -1,6 +1,7 @@
 import os
 import pprint
 
+import iara.default
 import iara.ml.models.trainer as iara_trn
 import iara.ml.metrics as iara_metrics
 
@@ -12,13 +13,15 @@ training_strategy = iara_trn.ModelTrainingStrategy.MULTICLASS
 grid_str = 'grid_search'
 output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
 
+result_dict = {}
+
 for eval_strategy in iara_trn.EvalStrategy:
 
     grid = iara_metrics.GridCompiler()
     best_params_dict = {}
 
     for feature in grid_search.Feature:
-        for classifier in grid_search.Classifier:
+        for classifier in iara.default.Classifier:
 
             compiled_dir = f'{output_base_dir}/compiled'
 
@@ -35,6 +38,9 @@ for eval_strategy in iara_trn.EvalStrategy:
                                 'Feature': feature,
                                 'Classifier': classifier
                             })
+                
+
+                
 
     print(f"\n############# {eval_strategy} #############")
     pprint.pprint(best_params_dict)

@@ -47,20 +47,19 @@ def main(override: bool,
         print('Not implemented test')
         return
 
-    exp_str = 'experiments' if not only_sample else 'experiments_sample'
+    exp_str = 'cpa_exp' if not only_sample else 'cpa_exp_sample'
 
     result_grid = {}
     for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
         result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
 
-    config_name = f'exp_{cpa_test}'
-    output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{exp_str}"
+    output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{exp_str}/exp_{cpa_test}"
 
     classifiers = [iara_default.Classifier.FOREST]
     # classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.CNN]
 
     manager_dict_0 = iara_default.default_mel_managers(
-                config_name = f'{config_name}_{str(collections[0])}',
+                config_name = f'{str(collections[0])}',
                 output_base_dir = output_base_dir,
                 classifiers = classifiers,
                 collection = iara_default.default_collection(only_sample=only_sample,
@@ -69,7 +68,7 @@ def main(override: bool,
                 training_strategy = training_strategy)
 
     manager_dict_1 = iara_default.default_mel_managers(
-                config_name = f'{config_name}_{str(collections[1])}',
+                config_name = f'{str(collections[1])}',
                 output_base_dir = output_base_dir,
                 classifiers = classifiers,
                 collection = iara_default.default_collection(only_sample=only_sample,
@@ -83,7 +82,7 @@ def main(override: bool,
     for classifier, manager in manager_dict_1.items():
         manager.run(folds = folds, override = override)
 
-    comparison_dir = f'{output_base_dir}/{config_name}_comparison'
+    comparison_dir = f'{output_base_dir}/comparison'
 
     for classifier in classifiers:
         comparator = iara_exp.CrossComparator(comparator_eval_dir = comparison_dir,
@@ -98,50 +97,41 @@ def main(override: bool,
 
 
 if __name__ == "__main__":
-    strategy_str_list = [str(i) for i in iara_trn.ModelTrainingStrategy]
+    strategy_choises = [str(i) for i in iara_trn.ModelTrainingStrategy]
 
     parser = argparse.ArgumentParser(description='RUN MLP grid search analysis')
     parser.add_argument('--override', action='store_true', default=False,
                         help='Ignore old runs')
     parser.add_argument('--only_sample', action='store_true', default=False,
                         help='Execute only in sample_dataset. For quick training and test.')
-    parser.add_argument('--training_strategy', type=str, choices=strategy_str_list,
+    parser.add_argument('--training_strategy', type=str, choices=strategy_choises,
                         default=None, help='Strategy for training the model')
-    parser.add_argument('--fold', type=str, default='',
-                        help='Specify folds to be executed. Example: 0,4-7')
+    parser.add_argument('-F', '--fold', type=str, default=None,
+                    help='Specify folds to be executed. Example: 0,4-7')
     test_choices=[1, 2]
-    parser.add_argument('--cpa_test', type=int, choices=test_choices, default=0,
+    parser.add_argument('--cpa_test', type=int, choices=test_choices, default=None,
                         help='Choose test option\
                             [1. Impact of the closest point for CPA,\
                             2. Impact of records containing CPA]')
 
     args = parser.parse_args()
 
-    folds_to_execute = []
-    if args.fold:
-        fold_ranges = args.fold.split(',')
-        for fold_range in fold_ranges:
-            if '-' in fold_range:
-                start, end = map(int, fold_range.split('-'))
-                folds_to_execute.extend(range(start, end + 1))
-            else:
-                folds_to_execute.append(int(fold_range))
+    folds_to_execute = iara.utils.str_to_list(args.fold, list(range(10)))
 
+    strategies = []
+    if args.training_strategy is not None:
+        index = strategy_choises.index(args.training_strategy)
+        strategies.append(iara_trn.ModelTrainingStrategy(index))
+    else:
+        strategies = iara_trn.ModelTrainingStrategy
 
     for n_test in test_choices if args.cpa_test == 0 else [args.cpa_test]:
 
-        if args.training_strategy is not None:
-            index = strategy_str_list.index(args.training_strategy)
+        for strategy in strategies:
+
+            index = strategy_choises.index(args.training_strategy)
             main(override = args.override,
                 folds = folds_to_execute,
                 only_sample = args.only_sample,
                 training_strategy = iara_trn.ModelTrainingStrategy(index),
                 cpa_test=n_test)
-
-        else:
-            for strategy in iara_trn.ModelTrainingStrategy:
-                main(override = args.override,
-                    folds = folds_to_execute,
-                    only_sample = args.only_sample,
-                    training_strategy = strategy,
-                    cpa_test=n_test)

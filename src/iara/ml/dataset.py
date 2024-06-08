@@ -204,6 +204,12 @@ class InputType():
             return f'Window [{self.n_overlap}]'
 
         return f'Image [{self.n_windows},{self.n_overlap}]'
+    
+    def type_str(self) -> str:
+        if self.n_windows == 1:
+            return 'window'
+        return 'image'
+
 
     @classmethod
     def Window(cls):
