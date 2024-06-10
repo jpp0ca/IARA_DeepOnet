@@ -47,9 +47,9 @@ class GridSearch():
             },
             iara_default.Classifier.CNN: {
                 self.headers[iara_default.Classifier.CNN][0]: ['16, 32',
-                                                  '16, 32, 64',
-                                                  '16, 32, 64, 128',
-                                                  '32, 64, 128, 256'],
+                                                                '16, 32, 64',
+                                                                '16, 32, 64, 128',
+                                                                '32, 64, 128, 256'],
                 self.headers[iara_default.Classifier.CNN][1]: [16, 32, 64, 128, 256, 512, 1024],
                 self.headers[iara_default.Classifier.CNN][2]: ['ReLU', 'PReLU', 'LeakyReLU'],
                 self.headers[iara_default.Classifier.CNN][3]: [0, 1e-3, 1e-5],

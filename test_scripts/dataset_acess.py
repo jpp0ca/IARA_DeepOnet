@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import itertools
 import shutil
+import numpy as np
 
 import iara.records
 import iara.ml.experiment as iara_exp
@@ -41,13 +42,22 @@ class OtherCollections(enum.Enum):
 print(OtherCollections.SHIPSEAR.to_df())
 
 
+def classify_row(df: pd.DataFrame) -> float:
+    classes_by_length = ['B', 'C', 'A', 'D', 'E']
+    try:
+        return classes_by_length.index(df['Class'])
+    except ValueError:
+        return np.nan
+
 collection = iara.records.CustomCollection(
-        collection = OtherCollections.SHIPSEAR,
-        target = iara.records.LabelTarget(column='Class',
-                                          values=['A', 'B', 'C', 'D', 'E'],
-                                          include_others=False),
-        only_sample=False
-    )
+            collection = OtherCollections.SHIPSEAR,
+            target = iara.records.GenericTarget(
+                n_targets = 5,
+                function = classify_row,
+                include_others = False
+            ),
+            only_sample=False
+        )
 
 print(collection.to_df())
 print(collection.to_compiled_df())
@@ -55,7 +65,7 @@ print(collection.to_compiled_df())
 
 config_name = f'shipsear'
 output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/data_acess"
-data_base_dir = "./data/shipsear"
+data_base_dir = "./data/shipsear_16e3"
 data_processed_base_dir = "./data/shipsear_processed"
 
 if os.path.exists(data_processed_base_dir):
@@ -68,47 +78,49 @@ dataset_processor = iara_manager.AudioFileProcessor(
         analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
         n_pts = 1024,
         n_overlap = 0,
-        decimation_rate = 3,
+        decimation_rate = 1,
         n_mels=256,
         integration_interval=0.512,
         extract_id = get_shipsear_id
     )
 
-dataset_processor.plot(file_id=collection.to_df()['ID'].to_list(),
-                       plot_type=iara_manager.PlotType.EXPORT_PLOT,
-                       frequency_in_x_axis=True,
-                       override=False)
+df, times = dataset_processor.get_data(file_id=7)
 
-config = iara_exp.Config(
-            name = config_name,
-            dataset = collection,
-            dataset_processor = dataset_processor,
-            output_base_dir = output_base_dir,
-            input_type = iara_default.default_window_input(),
-            exclusive_header=None)
+print('df: ', len(df))
+print('df: ', df)
 
-trainers = iara_default.get_default_mel_trainers(config.dataset.target.get_n_targets())
+# dataset_processor.plot(file_id=collection.to_df()['ID'].to_list(),
+#                        plot_type=iara_manager.PlotType.EXPORT_PLOT,
+#                        frequency_in_x_axis=True,
+#                        override=False)
 
-manager = iara_exp.Manager(config, *trainers)
-
-result_dict = manager.run()
+manager_dict = iara_default.default_mel_managers(config_name = config_name,
+                         output_base_dir = output_base_dir,
+                         classifiers = iara_default.Classifier,
+                         collection = collection,
+                         data_processor = dataset_processor)
 
 result_grid = {}
-for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
-    result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
+# for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
+#     result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
+result_grid[iara_trn.Subset.TEST, iara_trn.EvalStrategy.BY_AUDIO] = iara_metrics.GridCompiler()
 
-for (eval_subset, eval_strategy), grid in result_grid.items():
+for classifier, manager in manager_dict.items():
 
-    for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
+    result_dict = manager.run(folds = range(2))
 
-        for i_fold, result in enumerate(results):
+    for (eval_subset, eval_strategy), grid in result_grid.items():
 
-            grid.add(params={'ID': trainer_id},
-                        i_fold=i_fold,
-                        target=result['Target'],
-                        prediction=result['Prediction'])
+        for trainer_id, results in result_dict[eval_subset, eval_strategy].items():
+
+            for i_fold, result in enumerate(results):
+
+                grid.add(params={'ID': trainer_id},
+                            i_fold=i_fold,
+                            target=result['Target'],
+                            prediction=result['Prediction'])
 
 for dataset_id, grid in result_grid.items():
     print(f'########## {dataset_id} ############')
-    print(grid.print_cm())
     print(grid)
+    print(grid.print_best_cm())

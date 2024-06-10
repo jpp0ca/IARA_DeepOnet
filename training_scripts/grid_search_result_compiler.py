@@ -38,12 +38,10 @@ for eval_strategy in iara_trn.EvalStrategy:
                                 'Feature': feature,
                                 'Classifier': classifier
                             })
-                
-
-                
 
     print(f"\n############# {eval_strategy} #############")
     pprint.pprint(best_params_dict)
     print(grid)
     grid.export(f'{output_base_dir}/{eval_strategy}.pkl')
     grid.export(f'{output_base_dir}/{eval_strategy}.tex')
+

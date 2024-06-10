@@ -109,6 +109,11 @@ class Normalization(enum.Enum):
         return self.apply(data)
 
 
+def decimate(data: np.array, rate: typing.Union[int, float]):
+    b, a = sci.cheby1(8, 0.05, 0.8 / rate, btype='low')
+    y = sci.filtfilt(b, a, data)
+    return sci.resample(y, int(len(y) / rate))
+
 def tpsw(data: np.array, n_pts: int = None, n: int = None, p: int = None,
          a: int = None) -> np.array:
     """Perform TPSW data analysis
@@ -196,9 +201,8 @@ def spectrogram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0,
     else:
         n_overlap = n_overlap * 2
 
-    if decimation_rate > 1:
-        data = sci.decimate(data, decimation_rate)
-        fs = fs/decimation_rate
+    data = decimate(data, decimation_rate)
+    fs = fs/decimation_rate
 
     freq, time, power = sci.spectrogram(data,
                                     nfft=n_pts,
@@ -289,8 +293,8 @@ def log_melgram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0, 
 
     normalization = Normalization.MIN_MAX_ZERO_CENTERED
 
-    if decimation_rate > 1:
-        data = sci.decimate(data, decimation_rate)
+    if decimation_rate != 1:
+        data = decimate(data, decimation_rate)
         fs = fs/decimation_rate
 
     fmax=fs/2

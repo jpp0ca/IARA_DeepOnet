@@ -55,8 +55,8 @@ def main(override: bool,
 
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{exp_str}/exp_{cpa_test}"
 
-    classifiers = [iara_default.Classifier.FOREST]
-    # classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.CNN]
+    # classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.MLP, iara_default.Classifier.CNN]
+    classifiers = iara_default.Classifier
 
     manager_dict_0 = iara_default.default_mel_managers(
                 config_name = f'{str(collections[0])}',
@@ -125,7 +125,7 @@ if __name__ == "__main__":
     else:
         strategies = iara_trn.ModelTrainingStrategy
 
-    for n_test in test_choices if args.cpa_test == 0 else [args.cpa_test]:
+    for n_test in test_choices if args.cpa_test is None else [args.cpa_test]:
 
         for strategy in strategies:
 
