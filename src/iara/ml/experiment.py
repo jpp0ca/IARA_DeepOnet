@@ -389,12 +389,12 @@ class Manager():
         print(f'--- Dataset with {len(id_list)} n_folds ---')
         print(df)
 
-    def run(self, folds: typing.List[int] = None, override: bool = False) -> typing.Dict:
+    def run(self, folds: typing.List[int] = range, override: bool = False) -> typing.Dict:
         """Execute training based on the Config"""
         self.__prepare_output_dir(override=override)
         id_list = self.config.split_datasets()
 
-        # self.print_dataset_details(id_list)
+        self.print_dataset_details(id_list)
 
         for i_fold in folds if len(folds) == 1 else \
                                 tqdm.tqdm(folds,

@@ -94,10 +94,15 @@ def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTOR
 def default_collection(only_sample: bool = False,
                        collection: iara.records.Collection = iara.records.Collection.OS):
     """Method to get default collection for iara."""
+    if collection in [iara.records.Collection.OS, iara.records.Collection.GLIDER]:
+        n_targets = 5
+    else:
+        n_targets = 4
+
     return iara.records.CustomCollection(
             collection = collection,
             target = iara.records.GenericTarget(
-                n_targets = 5,
+                n_targets = n_targets,
                 function = Target.classify_row,
                 include_others = False
             ),

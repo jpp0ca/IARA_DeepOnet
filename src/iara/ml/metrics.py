@@ -15,6 +15,8 @@ import dill
 
 import sklearn.metrics as sk_metrics
 import scipy.stats as scipy
+import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 class Metric(enum.Enum):
     """Enumeration representing metrics for model analysis.
@@ -249,6 +251,49 @@ class CrossValidationCompiler():
 
         return result
 
+    def print_cm(self, filename: str = None, relative=True):
+        dict_id = 'rel_cm' if relative else 'abs_cm'
+
+        num_folds = len(self._score_dict[dict_id])
+        first_matrix = next(iter(self._score_dict[dict_id].values()))
+        n_classes = first_matrix.shape[0]
+
+        confusion_matrices_3d = np.zeros((num_folds, n_classes, n_classes))
+
+        for i_fold, rel_cm in self._score_dict[dict_id].items():
+            confusion_matrices_3d[i_fold, :, :] = rel_cm
+
+        mean_cm = np.mean(confusion_matrices_3d, axis=0) * (100 if relative else 1)
+        std_cm = np.std(confusion_matrices_3d, axis=0) * (100 if relative else 1)
+
+
+        string = ''
+        for i in range(n_classes):
+            string = f'{string}\t    {i}:\t'
+        print(string)
+        for i in range(n_classes):
+            string = ''
+            for j in range(n_classes):
+                string = f'{string}\t{mean_cm[i,j]:.2f} ± {std_cm[i,j]:.2f}'
+            print(f'{i}:  {string}')
+
+        if filename is None:
+            return
+
+        fig, ax = plt.subplots(figsize=(10, 8))
+        cax = ax.matshow(mean_cm, cmap=mpl.cm.Blues)
+        fig.colorbar(cax)
+
+        for (i, j), val in np.ndenumerate(mean_cm):
+            std_val = std_cm[i, j]
+            ax.text(j, i, f'{val:.2f} ± {std_val:.2f}', ha='center', va='center', color='black')
+
+        ax.set_xlabel('Predicted Label')
+        ax.set_ylabel('True Label')
+        ax.set_title('Confusion Matrix with Mean ± Std')
+
+        plt.savefig(filename, dpi=300, bbox_inches='tight')
+
     @staticmethod
     def str_format(values, n_samples=60, tex_format=False) -> str:
         """Format the values as a string.
@@ -431,6 +476,13 @@ class GridCompiler():
                 best_cv = cv_dict
 
         return best_cv['params'], best_cv['cv']
+
+    def print_best_cm(self, filename: str = None, metric: Metric = Metric.SP_INDEX, relative=True):
+        if self.is_empty():
+            return
+
+        _, cv = self.get_best(metric=metric)
+        cv.print_cm(filename=filename, relative=relative)
 
     def export(self, filename):
         if self.is_empty():
