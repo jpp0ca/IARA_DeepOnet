@@ -389,12 +389,14 @@ class Manager():
         print(f'--- Dataset with {len(id_list)} n_folds ---')
         print(df)
 
-    def run(self, folds: typing.List[int] = range, override: bool = False) -> typing.Dict:
+    def run(self, folds: typing.List[int] = range, override: bool = False, without_ret = False) -> typing.Dict:
         """Execute training based on the Config"""
         self.__prepare_output_dir(override=override)
         id_list = self.config.split_datasets()
 
-        self.print_dataset_details(id_list)
+        # self.print_dataset_details(id_list)
+
+        df = self.config.dataset.to_df()
 
         for i_fold in folds if len(folds) == 1 else \
                                 tqdm.tqdm(folds,
@@ -417,6 +419,7 @@ class Manager():
                 iara_trainer.Subset.TRN: trn_set,
                 iara_trainer.Subset.VAL: val_set,
                 iara_trainer.Subset.TEST: test_set,
+                iara_trainer.Subset.ALL: df
             }
 
             for _ in tqdm.tqdm(range(1),
@@ -435,6 +438,8 @@ class Manager():
                                 eval_strategy=eval_strategy,
                                 dataset_ids=id_set[eval_subset]['ID'].to_list())
 
+        if without_ret:
+            return None
 
         eval_dict = {}
         for eval_subset, eval_strategy in \
@@ -465,8 +470,10 @@ class CrossComparator():
                        manager_a: Manager,
                        manager_b: Manager,
                        eval_strategy: iara_trainer.EvalStrategy,
+                       eval_subset: iara_trainer.Subset = iara_trainer.Subset.TEST,
                        folds: typing.List[int] = None):
 
+        df = manager_b.config.dataset.to_df()
         id_list = manager_b.config.split_datasets()
         loader = manager_b.get_experiment_loader()
         
@@ -478,7 +485,7 @@ class CrossComparator():
             eval_base_dir = os.path.join(manager_a.config.output_base_dir,
                                             'eval',
                                             f'fold_{i_fold}')
-            evaluation = trainer.eval(eval_subset=iara_trainer.Subset.TEST,
+            evaluation = trainer.eval(eval_subset=eval_subset,
                                 eval_strategy=eval_strategy,
                                 eval_base_dir=eval_base_dir)
 
@@ -494,20 +501,29 @@ class CrossComparator():
                         prediction=evaluation['Prediction'])
 
 
-            (_, _, test_set) = id_list[i_fold]
+            (trn_set, val_set, test_set) = id_list[i_fold]
 
-            loader.pre_load(test_set['ID'].to_list())
+            if eval_subset == iara_trainer.Subset.TRN:
+                ids = trn_set['ID'].to_list()
+            elif eval_subset == iara_trainer.Subset.VAL:
+                ids = val_set['ID'].to_list()
+            elif eval_subset == iara_trainer.Subset.TEST:
+                ids = test_set['ID'].to_list()
+            elif eval_subset == iara_trainer.Subset.ALL:
+                ids = df['ID'].to_list()
+
+            loader.pre_load(ids)
 
             dataset = iara_dataset.AudioDataset(
                         loader,
                         manager_b.config.input_type,
-                        test_set['ID'].to_list())
+                        ids)
 
             model_base_dir = manager_a.get_model_base_dir(i_fold)
 
-            evaluation = trainer.eval(eval_subset = iara_trainer.Subset.TEST,
+            evaluation = trainer.eval(eval_subset = eval_subset,
                                         eval_strategy = eval_strategy,
-                                        eval_base_dir = self.comparator_eval_dir,
+                                        eval_base_dir = f'{self.comparator_eval_dir}/{manager_a.config.name}',
                                         model_base_dir = model_base_dir,
                                         dataset = dataset,
                                         complement_id=str(i_fold))
@@ -523,10 +539,10 @@ class CrossComparator():
                         target=evaluation['Target'],
                         prediction=evaluation['Prediction'])
 
-
-    def cross_compare_in_test(self,
-                              eval_strategy: iara_trainer.EvalStrategy,
-                              folds: typing.List[int] = None):
+    def cross_compare(self,
+                      eval_strategy: iara_trainer.EvalStrategy,
+                      eval_subset: iara_trainer.Subset = iara_trainer.Subset.TEST,
+                      folds: typing.List[int] = None):
 
         grid = iara_metrics.GridCompiler()
 
@@ -541,6 +557,7 @@ class CrossComparator():
                        manager_a = self.manager_a,
                        manager_b = self.manager_b,
                        eval_strategy = eval_strategy,
+                       eval_subset = eval_subset,
                        folds = folds)
 
 
@@ -555,41 +572,73 @@ class CrossComparator():
                        manager_a = self.manager_b,
                        manager_b = self.manager_a,
                        eval_strategy = eval_strategy,
+                       eval_subset = eval_subset,
                        folds = folds)
 
+        return grid
+    
+    def __eval_dataset(self,
+                       grid: iara_metrics.GridCompiler,
+                       manager: Manager,
+                       trainer: iara_trainer.BaseTrainer,
+                       dataset: iara_dataset.AudioDataset,
+                       eval_strategy: iara_trainer.EvalStrategy = iara_trainer.EvalStrategy.BY_AUDIO,
+                       eval_subset: iara_trainer.Subset = iara_trainer.Subset.ALL,
+                       folds: typing.List[int] = None):
 
-        # for trainer_1, trainer_2 in itertools.permutations(self.manager_list, 2):
+        for i_fold in folds:
 
+            model_base_dir = manager.get_model_base_dir(i_fold)
 
-        #     dataset = iara_dataset.AudioDataset(trainer_2.config.dataset_processor,
-        #                                         test_df1['ID'],
-        #                                         test_df1['Target'])
+            evaluation = trainer.eval(eval_subset = eval_subset,
+                                        eval_strategy = eval_strategy,
+                                        eval_base_dir = f'{self.comparator_eval_dir}/{manager.config.name}',
+                                        model_base_dir = model_base_dir,
+                                        dataset = dataset,
+                                        complement_id=str(i_fold))
 
-        #     for trainer in trainer_1.trainer_list:
+            param_dict = {
+                'Trainer': trainer.trainer_id,
+                'Trained': manager.config.name
+            }
 
-        #         for i_fold in range(trainer_1.config.kfolds):
+            grid.add(params=param_dict,
+                        i_fold=i_fold,
+                        target=evaluation['Target'],
+                        prediction=evaluation['Prediction'])
 
-        #             if folds and i_fold not in folds:
-        #                 continue
+    def cross_compare_outsource(self,
+                dataset: iara_dataset.AudioDataset,
+                eval_strategy: iara_trainer.EvalStrategy = iara_trainer.EvalStrategy.BY_AUDIO,
+                eval_subset: iara_trainer.Subset = iara_trainer.Subset.ALL,
+                folds: typing.List[int] = None):
 
-        #             model_base_dir = os.path.join(trainer_1.config.output_base_dir,
-        #                                     'model',
-        #                                     f'{i_fold}_of_{trainer_1.config.kfolds}')
+        grid = iara_metrics.GridCompiler()
 
-        #             evaluation = trainer.eval(
-        #                 dataset_id=f'{trainer_2.config.name}_{str(trainer_1.config.name)}_{i_fold}',
-        #                 eval_base_dir = self.output_dir,
-        #                 model_base_dir = model_base_dir,
-        #                 dataset = dataset)
+        for trainer in tqdm.tqdm(self.manager_a.trainer_list,
+                                    leave=False,
+                                    desc="Trainers",
+                                    ncols=120):
 
-        #             grid.add(params={'': f'{trainer_1.config.name} ({trainer.trainer_id}) \
-        #                         -> {trainer_2.config.name}'},
-        #                      i_fold=i_fold,
-        #                      target=evaluation['Target'],
-        #                      prediction=evaluation['Prediction'])
+            self.__eval_dataset(grid = grid,
+                    manager = self.manager_a,
+                    trainer = trainer,
+                    dataset = dataset,
+                    eval_strategy = eval_strategy,
+                    eval_subset = eval_subset,
+                    folds = folds)
 
-        # print('\n______________Comparison________________________')
-        # print(grid.as_str())
-        # print('----------------------------------------')
+        for trainer in tqdm.tqdm(self.manager_b.trainer_list,
+                                    leave=False,
+                                    desc="Trainers",
+                                    ncols=120):
+
+            self.__eval_dataset(grid = grid,
+                    manager = self.manager_b,
+                    trainer = trainer,
+                    dataset = dataset,
+                    eval_strategy = eval_strategy,
+                    eval_subset = eval_subset,
+                    folds = folds)
 
         return grid

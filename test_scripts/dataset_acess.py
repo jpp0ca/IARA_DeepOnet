@@ -86,19 +86,16 @@ dataset_processor = iara_manager.AudioFileProcessor(
 
 df, times = dataset_processor.get_data(file_id=7)
 
-print('df: ', len(df))
-print('df: ', df)
-
 # dataset_processor.plot(file_id=collection.to_df()['ID'].to_list(),
 #                        plot_type=iara_manager.PlotType.EXPORT_PLOT,
 #                        frequency_in_x_axis=True,
 #                        override=False)
 
 manager_dict = iara_default.default_mel_managers(config_name = config_name,
-                         output_base_dir = output_base_dir,
-                         classifiers = iara_default.Classifier,
-                         collection = collection,
-                         data_processor = dataset_processor)
+                    output_base_dir = output_base_dir,
+                    classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.CNN],
+                    collection = collection,
+                    data_processor = dataset_processor)
 
 result_grid = {}
 # for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
@@ -123,4 +120,6 @@ for classifier, manager in manager_dict.items():
 for dataset_id, grid in result_grid.items():
     print(f'########## {dataset_id} ############')
     print(grid)
-    print(grid.print_best_cm())
+    print(grid.get_best())
+    grid.print_best_cm()
+    grid.print_best_cm(relative=False)

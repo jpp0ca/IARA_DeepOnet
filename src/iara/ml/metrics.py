@@ -108,6 +108,7 @@ class Metric(enum.Enum):
 class Test(enum.Enum):
     F_TEST_5x2 = 0
     STD_OVERLAY = 1
+    WILCOXON = 2
 
     @staticmethod
     def std_overlay(sample1: np.ndarray, sample2: np.ndarray, confidence_level: float) -> bool:
@@ -122,6 +123,8 @@ class Test(enum.Enum):
         #http://rasbt.github.io/mlxtend/user_guide/evaluate/combined_ftest_5x2cv/
         #https://www.cmpe.boun.edu.tr/~ethem/files/papers/NC110804.PDF
         if len(sample1) != 10 or len(sample2) != 10:
+            print('sample1: ', len(sample1))
+            print('sample2: ', len(sample2))
             raise UnboundLocalError('For Ftest_5x2 must be calculated 10 values')
 
         p_1_a = sample1[0::2]
@@ -147,7 +150,20 @@ class Test(enum.Enum):
 
         return f > scipy.f.ppf(confidence_level, 10, 5), confidence
 
-    def reject_equal_hipoteses(self, sample1: typing.Iterable, sample2: typing.Iterable, confidence_level = 0.95) -> bool: #return true se diferente
+    @staticmethod
+    def wilcoxon(sample1: np.ndarray, sample2: np.ndarray, confidence_level: float) -> bool:
+        if len(sample1) != len(sample2):
+            print('sample1: ', len(sample1))
+            print('sample2: ', len(sample2))
+            raise UnboundLocalError('Wilcoxon Signed-rank must be calculated with sample with same length')
+
+        if np.sum(sample1 - sample2) == 0:
+            return False, 0
+
+        _, p_value = scipy.wilcoxon(sample1, sample2)
+        return (1 - p_value) > confidence_level, (1 - p_value)
+
+    def eval(self, sample1: typing.Iterable, sample2: typing.Iterable, confidence_level = 0.95) -> bool: #return true se diferente
         return getattr(self.__class__, self.name.lower())(sample1, sample2, confidence_level)
 
 

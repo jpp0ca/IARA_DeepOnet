@@ -87,6 +87,7 @@ class Subset(enum.Enum):
     VAL = 1
     VALIDATION = 1
     TEST = 2
+    ALL = 3
 
     def __str__(self) -> str:
         return str(self.name).rsplit('.', maxsplit=1)[-1].lower()
@@ -343,7 +344,8 @@ class BaseTrainer():
                              eval_strategy = eval_strategy,
                              eval_base_dir = eval_base_dir,
                              model_base_dir = model_base_dir,
-                             dataset = dataset)
+                             dataset = dataset,
+                             complement_id = complement_id)
 
     def is_evaluated(self,
             eval_subset: Subset,
@@ -458,10 +460,10 @@ class OptimizerTrainer(BaseTrainer):
         raise NotImplementedError('TrainingStrategy has not _loss implemented')
 
     def _check_dataset(self, dataset: iara_dataset.BaseDataset):
-        unique_targets = torch.unique(dataset.get_targets())
-        expected_targets = torch.arange(self.n_targets)
+        unique_targets = set(torch.unique(dataset.get_targets()).int().tolist())
+        expected_targets = set(torch.arange(self.n_targets).int().tolist())
 
-        if not torch.equal(unique_targets.sort()[0], expected_targets):
+        if not set(expected_targets).issubset(set(unique_targets)):
             print('unique_targets: ', unique_targets)
             print('expected_targets: ', expected_targets)
             raise UnboundLocalError(f'Targets in dataset not compatible with NNTrainer \

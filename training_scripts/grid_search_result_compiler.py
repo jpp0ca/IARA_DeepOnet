@@ -20,8 +20,8 @@ for eval_strategy in iara_trn.EvalStrategy:
     grid = iara_metrics.GridCompiler()
     best_params_dict = {}
 
-    for feature in grid_search.Feature:
-        for classifier in iara.default.Classifier:
+    for classifier in iara.default.Classifier:
+        for feature in [grid_search.Feature.MEL, grid_search.Feature.LOFAR]:
 
             compiled_dir = f'{output_base_dir}/compiled'
 

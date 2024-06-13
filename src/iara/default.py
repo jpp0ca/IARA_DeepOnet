@@ -160,12 +160,12 @@ def default_mel_managers(config_name: str,
                     model_allocator=lambda input_shape, n_targets:
                             iara_cnn.CNN(
                                 input_shape=input_shape,
-                                conv_activation = torch.nn.PReLU(),
+                                n_targets = n_targets,
                                 conv_n_neurons = [16, 32, 64, 128],
+                                classification_n_neurons = 128,
+                                conv_activation = torch.nn.PReLU(),
                                 conv_pooling = torch.nn.AvgPool2d(2, 2),
                                 kernel_size = 3,
-                                classification_n_neurons = 128,
-                                n_targets = n_targets,
                                 dropout_prob = 0.4),
                     optimizer_allocator=lambda model:
                             torch.optim.Adam(model.parameters(), weight_decay=1e-3),

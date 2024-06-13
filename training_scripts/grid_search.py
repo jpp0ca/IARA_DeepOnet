@@ -50,7 +50,7 @@ class GridSearch():
                                                                 '16, 32, 64',
                                                                 '16, 32, 64, 128',
                                                                 '32, 64, 128, 256'],
-                self.headers[iara_default.Classifier.CNN][1]: [16, 32, 64, 128, 256, 512, 1024],
+                self.headers[iara_default.Classifier.CNN][1]: [16, 64, 128, 256, 1024],
                 self.headers[iara_default.Classifier.CNN][2]: ['ReLU', 'PReLU', 'LeakyReLU'],
                 self.headers[iara_default.Classifier.CNN][3]: [0, 1e-3, 1e-5],
                 self.headers[iara_default.Classifier.CNN][4]: ['Max', 'Avg'],
@@ -91,7 +91,7 @@ class GridSearch():
                 },
                 iara_default.Classifier.CNN: {
                     self.headers[iara_default.Classifier.CNN][0]: ['16, 32, 64, 128'],
-                    self.headers[iara_default.Classifier.CNN][1]: [128],
+                    self.headers[iara_default.Classifier.CNN][1]: [64],
                     self.headers[iara_default.Classifier.CNN][2]: ['ReLU'],
                     self.headers[iara_default.Classifier.CNN][3]: [0],
                     self.headers[iara_default.Classifier.CNN][4]: ['Avg'],

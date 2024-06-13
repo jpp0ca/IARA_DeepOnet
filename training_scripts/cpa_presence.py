@@ -89,7 +89,7 @@ def main(override: bool,
                                               manager_a = manager_dict_0[classifier],
                                               manager_b = manager_dict_1[classifier])
 
-        result_grid = comparator.cross_compare_in_test(
+        result_grid = comparator.cross_compare(
                                 eval_strategy = iara_trn.EvalStrategy.BY_WINDOW,
                                 folds = folds)
 
