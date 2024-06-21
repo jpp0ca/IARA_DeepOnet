@@ -96,7 +96,6 @@ class ExperimentDataLoader():
             # Tratar o erro capturando qualquer exceção
             print(f"Ocorreu um erro: {e}")
 
-
     def __load(self, file_id: int, target) -> None:
         """ Process or/and load a single file to data map
 
@@ -143,6 +142,9 @@ class ExperimentDataLoader():
 
         if n_samples != 1:
             sample = torch.unsqueeze(sample, dim=0)
+
+        if n_samples == 1:
+            sample = sample.squeeze(1)
 
         return sample, target
 

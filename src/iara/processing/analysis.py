@@ -267,7 +267,7 @@ def lofar(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0,
     return power, freq, time
 
 def log_melgram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0, n_mels: int = 256,
-        decimation_rate: int = 1, **kwargs) -> typing.Tuple[np.array, np.array, np.array]:
+        decimation_rate: int = 1, normalization: Normalization = Normalization.MIN_MAX_ZERO_CENTERED, **kwargs) -> typing.Tuple[np.array, np.array, np.array]:
     """Perform log_melgram data analysis
 
         Args:
@@ -290,8 +290,6 @@ def log_melgram(data: np.array, fs: float, n_pts: int =1024, n_overlap: int =0, 
     n_overlap *= 2
     hop_length=n_fft-n_overlap
     discard=int(np.floor(n_fft/hop_length))
-
-    normalization = Normalization.MIN_MAX_ZERO_CENTERED
 
     if decimation_rate != 1:
         data = decimate(data, decimation_rate)

@@ -104,7 +104,6 @@ class Metric(enum.Enum):
             dict_values[metric] = metric.compute(target, prediction)
         return dict_values
 
-
 class Test(enum.Enum):
     F_TEST_5x2 = 0
     STD_OVERLAY = 1
@@ -165,7 +164,6 @@ class Test(enum.Enum):
 
     def eval(self, sample1: typing.Iterable, sample2: typing.Iterable, confidence_level = 0.95) -> bool: #return true se diferente
         return getattr(self.__class__, self.name.lower())(sample1, sample2, confidence_level)
-
 
 class CrossValidationCompiler():
     """Class for compiling cross-validation results.
@@ -383,7 +381,6 @@ class CrossValidationCompiler():
             ret = f'{ret}{metric}[{self.metric_as_str(metric)}], '
         return ret[:-2]
 
-
 class GridCompiler():
     """Class for compiling grid search results.
 
@@ -492,6 +489,10 @@ class GridCompiler():
                 best_cv = cv_dict
 
         return best_cv['params'], best_cv['cv']
+
+    def get_cv(self, params: typing.Dict):
+        params_hash = hash(tuple(params.items()))
+        return self.cv_dict[params_hash]['cv']
 
     def print_best_cm(self, filename: str = None, metric: Metric = Metric.SP_INDEX, relative=True):
         if self.is_empty():
