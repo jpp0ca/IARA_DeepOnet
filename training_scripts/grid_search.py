@@ -25,37 +25,42 @@ class GridSearch():
     def __init__(self) -> None:
         self.print_headers = {
             iara_default.Classifier.FOREST: ['Estimators', 'Max depth'],
-            iara_default.Classifier.MLP: ['Neurons', 'Activation', 'Weight decay'],
+            iara_default.Classifier.MLP: ['Neurons', 'Activation', 'Output activation',
+                                          'Learning Rate', 'Weight decay'],
             iara_default.Classifier.CNN: ['conv_n_neurons', 'classification_n_neurons', 'Activation',
-                             'Weight decay', 'conv_pooling', 'kernel', 'dropout']
+                                          'conv_pooling', 'kernel', 'dropout', 'Output activation',
+                                          'Learning Rate', 'Weight decay']
         }
         self.headers = {
             iara_default.Classifier.FOREST: ['est', 'depth'],
-            iara_default.Classifier.MLP: ['neurons', 'act', 'weight'],
-            iara_default.Classifier.CNN: ['n_conv', 'n_mlp', 'act',
-                             'weight', 'pool', 'kern', 'drop']
+            iara_default.Classifier.MLP: ['neurons', 'act', 'output', 'lr', 'weight'],
+            iara_default.Classifier.CNN: ['n_conv', 'n_mlp', 'act', 'pool', 'kern', 'drop',
+                                          'output', 'lr', 'weight']
         }
         self.complete_grid = {
             iara_default.Classifier.FOREST: {
-                self.headers[iara_default.Classifier.FOREST][0]: [25, 50, 100, 150, 200, 250],
-                self.headers[iara_default.Classifier.FOREST][1]: [5, 10, 15, 20]
+                self.headers[iara_default.Classifier.FOREST][0]: [50, 150, 250],
+                self.headers[iara_default.Classifier.FOREST][1]: [5, 10, 15]
             },
             iara_default.Classifier.MLP: {
                 self.headers[iara_default.Classifier.MLP][0]: [64, 128, 256, 1024],
                 self.headers[iara_default.Classifier.MLP][1]: ['Tanh', 'ReLU', 'PReLU'],
-                self.headers[iara_default.Classifier.MLP][2]: [0, 1e-3, 1e-5]
+                self.headers[iara_default.Classifier.MLP][2]: ['Sigmoid', 'ReLU', 'Linear'],
+                self.headers[iara_default.Classifier.MLP][3]: [1e-3, 1e-4, 1e-5],
+                self.headers[iara_default.Classifier.MLP][4]: [0, 1e-3, 1e-5]
             },
             iara_default.Classifier.CNN: {
-                self.headers[iara_default.Classifier.CNN][0]: ['16, 32',
-                                                                '16, 32, 64',
-                                                                '16, 32, 64, 128',
-                                                                '32, 64, 128, 256'],
-                self.headers[iara_default.Classifier.CNN][1]: [16, 64, 128, 256, 1024],
+                self.headers[iara_default.Classifier.CNN][0]: ['16, 32, 64',
+                                                               '16, 32, 64, 128',
+                                                               '32, 64, 128, 256'],
+                self.headers[iara_default.Classifier.CNN][1]: [256, 1024, 2048],
                 self.headers[iara_default.Classifier.CNN][2]: ['ReLU', 'PReLU', 'LeakyReLU'],
-                self.headers[iara_default.Classifier.CNN][3]: [0, 1e-3, 1e-5],
-                self.headers[iara_default.Classifier.CNN][4]: ['Max', 'Avg'],
-                self.headers[iara_default.Classifier.CNN][5]: [3, 5, 7],
-                self.headers[iara_default.Classifier.CNN][6]: [0.2, 0.4, 0.6]
+                self.headers[iara_default.Classifier.CNN][3]: ['Max', 'Avg'],
+                self.headers[iara_default.Classifier.CNN][4]: [3, 5, 7],
+                self.headers[iara_default.Classifier.CNN][5]: [0, 0.2, 0.4, 0.6],
+                self.headers[iara_default.Classifier.CNN][6]: ['Sigmoid', 'ReLU', 'Linear'],
+                self.headers[iara_default.Classifier.CNN][7]: [1e-3, 1e-4, 1e-5],
+                self.headers[iara_default.Classifier.CNN][8]: [0, 1e-3, 1e-5],
             }
         }
         self.small_grid = {
@@ -67,16 +72,20 @@ class GridSearch():
                 iara_default.Classifier.MLP: {
                     self.headers[iara_default.Classifier.MLP][0]: [128],
                     self.headers[iara_default.Classifier.MLP][1]: ['PReLU'],
-                    self.headers[iara_default.Classifier.MLP][2]: [0]
+                    self.headers[iara_default.Classifier.MLP][2]: ['Sigmoid'],
+                    self.headers[iara_default.Classifier.MLP][3]: [1e-4],
+                    self.headers[iara_default.Classifier.MLP][4]: [1e-3]
                 },
                 iara_default.Classifier.CNN: {
-                    self.headers[iara_default.Classifier.CNN][0]: ['16, 32, 64, 128'],
-                    self.headers[iara_default.Classifier.CNN][1]: [128],
-                    self.headers[iara_default.Classifier.CNN][2]: ['PReLU'],
-                    self.headers[iara_default.Classifier.CNN][3]: [1e-3],
-                    self.headers[iara_default.Classifier.CNN][4]: ['Avg'],
-                    self.headers[iara_default.Classifier.CNN][5]: [3],
-                    self.headers[iara_default.Classifier.CNN][6]: [0.4]
+                    self.headers[iara_default.Classifier.CNN][0]: ['16, 64, 128, 512'],
+                    self.headers[iara_default.Classifier.CNN][1]: [256],
+                    self.headers[iara_default.Classifier.CNN][2]: ['ReLU'],
+                    self.headers[iara_default.Classifier.CNN][3]: ['Avg'],
+                    self.headers[iara_default.Classifier.CNN][4]: [5],
+                    self.headers[iara_default.Classifier.CNN][5]: [0.4],
+                    self.headers[iara_default.Classifier.CNN][6]: ['Linear'],
+                    self.headers[iara_default.Classifier.CNN][7]: [1e-4],
+                    self.headers[iara_default.Classifier.CNN][8]: [1e-3],
                 }
             },
             Feature.LOFAR: {
@@ -87,16 +96,20 @@ class GridSearch():
                 iara_default.Classifier.MLP: {
                     self.headers[iara_default.Classifier.MLP][0]: [128],
                     self.headers[iara_default.Classifier.MLP][1]: ['Tanh'],
-                    self.headers[iara_default.Classifier.MLP][2]: [0]
+                    self.headers[iara_default.Classifier.MLP][2]: ['Sigmoid'],
+                    self.headers[iara_default.Classifier.MLP][3]: [1e-4],
+                    self.headers[iara_default.Classifier.MLP][4]: [1e-3]
                 },
                 iara_default.Classifier.CNN: {
                     self.headers[iara_default.Classifier.CNN][0]: ['16, 32, 64, 128'],
-                    self.headers[iara_default.Classifier.CNN][1]: [64],
+                    self.headers[iara_default.Classifier.CNN][1]: [256],
                     self.headers[iara_default.Classifier.CNN][2]: ['ReLU'],
-                    self.headers[iara_default.Classifier.CNN][3]: [0],
-                    self.headers[iara_default.Classifier.CNN][4]: ['Avg'],
-                    self.headers[iara_default.Classifier.CNN][5]: [3],
-                    self.headers[iara_default.Classifier.CNN][6]: [0.4]
+                    self.headers[iara_default.Classifier.CNN][3]: ['Avg'],
+                    self.headers[iara_default.Classifier.CNN][4]: [3],
+                    self.headers[iara_default.Classifier.CNN][5]: [0.4],
+                    self.headers[iara_default.Classifier.CNN][6]: ['Sigmoid'],
+                    self.headers[iara_default.Classifier.CNN][7]: [1e-5],
+                    self.headers[iara_default.Classifier.CNN][8]: [1e-3],
                 }
             }
         }
@@ -144,15 +157,17 @@ class GridSearch():
         param_dict = {}
 
         activation_dict = {
-                'Tanh': torch.nn.Tanh(),
-                'ReLU': torch.nn.ReLU(),
-                'PReLU': torch.nn.PReLU(),
-                'LeakyReLU': torch.nn.LeakyReLU()
+                'Tanh': torch.nn.Tanh,
+                'ReLU': torch.nn.ReLU,
+                'PReLU': torch.nn.PReLU,
+                'LeakyReLU': torch.nn.LeakyReLU,
+                'Sigmoid': torch.nn.Sigmoid,
+                'Linear': None
         }
 
         pooling_dict = {
-                'Max': torch.nn.MaxPool2d(2, 2),
-                'Avg': torch.nn.AvgPool2d(2, 2)
+                'Max': torch.nn.MaxPool2d,
+                'Avg': torch.nn.AvgPool2d
         }
 
         combinations = list(itertools.product(*grid_search.values()))
@@ -183,15 +198,17 @@ class GridSearch():
                         batch_size = 4*1024,
                         model_allocator = lambda input_shape, n_targets,
                             n_neurons = param_pack[self.headers[classifier][0]],
-                            activation = activation_dict[param_pack[self.headers[classifier][1]]]:
+                            activation = activation_dict[param_pack[self.headers[classifier][1]]],
+                            output_activation = activation_dict[param_pack[self.headers[classifier][2]]]:
                                 iara_mlp.MLP(input_shape = input_shape,
-                                    n_neurons = n_neurons,
+                                    hidden_channels = n_neurons,
                                     n_targets = n_targets,
-                                    activation_hidden_layer = activation),
+                                    activation_layer = activation,
+                                    activation_output_layer = output_activation),
                         optimizer_allocator=lambda model,
-                            weight_decay = param_pack[self.headers[classifier][2]]:
-                                torch.optim.Adam(model.parameters(),
-                                    weight_decay=weight_decay)))
+                            lr = param_pack[self.headers[classifier][3]],
+                            weight_decay = param_pack[self.headers[classifier][4]]:
+                                torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)))
 
             elif classifier == iara_default.Classifier.CNN:
 
@@ -206,20 +223,23 @@ class GridSearch():
                             conv_neurons = conv_n_neurons,
                             class_neurons = param_pack[self.headers[classifier][1]],
                             activation = activation_dict[param_pack[self.headers[classifier][2]]],
-                            pooling = pooling_dict[param_pack[self.headers[classifier][4]]],
-                            kernel = param_pack[self.headers[classifier][5]],
-                            dropout = param_pack[self.headers[classifier][6]]:
+                            pooling = pooling_dict[param_pack[self.headers[classifier][3]]],
+                            kernel = param_pack[self.headers[classifier][4]],
+                            dropout = param_pack[self.headers[classifier][5]],
+                            out_activation = activation_dict[param_pack[self.headers[classifier][6]]]:
                                 iara_cnn.CNN(
                                     input_shape = input_shape,
-                                    conv_activation   = activation,
                                     conv_n_neurons = conv_neurons,
+                                    classification_n_neurons = class_neurons,
+                                    conv_activation   = activation,
                                     conv_pooling = pooling,
                                     kernel_size = kernel,
-                                    classification_n_neurons = class_neurons,
                                     n_targets = n_targets,
-                                    dropout_prob = dropout),
+                                    dropout_prob = dropout,
+                                    classification_output_activation = out_activation),
                         optimizer_allocator=lambda model,
-                            weight_decay = param_pack[self.headers[classifier][3]]:
+                            lr = param_pack[self.headers[classifier][7]],
+                            weight_decay = param_pack[self.headers[classifier][8]]:
                                 torch.optim.Adam(model.parameters(), weight_decay = weight_decay)))
 
             else:
@@ -329,8 +349,10 @@ def main(classifier: iara_default.Classifier,
                                 target=result['Target'],
                                 prediction=result['Prediction'])
 
-    for dataset_id, grid_compiler in result_grid.items():
-        print(f'########## {dataset_id} ############')
+    for (eval_subset, eval_strategy), grid_compiler in result_grid.items():
+        if eval_subset == iara_trn.Subset.TEST:
+            continue
+        print(f'########## {eval_subset} - {eval_strategy} ############')
         print(grid_compiler)
 
     if only_eval:

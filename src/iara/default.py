@@ -36,19 +36,16 @@ DEFAULT_DEEPSHIP_DIRECTORIES = Directories(data_dir="/data/deepship",
 
 class Target(enum.Enum):
     # https://www.mdpi.com/2072-4292/11/3/353
-    VERY_SMALL = 0
-    SMALL = 1
-    MEDIUM = 2
-    LARGE = 3
-    BACKGROUND = 4
+    SMALL = 0
+    MEDIUM = 1
+    LARGE = 2
+    BACKGROUND = 3
 
     @staticmethod
     def classify(ship_length: float) -> 'Target':
         if np.isnan(ship_length):
             return Target.BACKGROUND
 
-        if ship_length < 15:
-            return Target.VERY_SMALL
         if ship_length < 50:
             return Target.SMALL
         if ship_length < 100:
@@ -95,9 +92,9 @@ def default_collection(only_sample: bool = False,
                        collection: iara.records.Collection = iara.records.Collection.OS):
     """Method to get default collection for iara."""
     if collection in [iara.records.Collection.OS, iara.records.Collection.GLIDER]:
-        n_targets = 5
-    else:
         n_targets = 4
+    else:
+        n_targets = 3
 
     return iara.records.CustomCollection(
             collection = collection,
@@ -113,7 +110,7 @@ def default_window_input():
     return iara_dataset.InputType.Window()
 
 def default_image_input():
-    return iara_dataset.InputType.Image(n_windows=16, overlap=0.5)
+    return iara_dataset.InputType.Image(n_windows=32, overlap=0.5)
 
 
 class Classifier(enum.Enum):

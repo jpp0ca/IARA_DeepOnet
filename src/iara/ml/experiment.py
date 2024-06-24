@@ -33,7 +33,7 @@ class Config:
                 output_base_dir: str,
                 test_ratio: float = 0.25,
                 exclusive_ships_on_test = True,
-                exclusive_header = 'Ship ID',
+                exclusive_header = 'ID',
                 target_header = 'Target'):
         """
         Parameters:

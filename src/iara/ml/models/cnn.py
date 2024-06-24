@@ -11,16 +11,17 @@ class CNN(iara_model.BaseModel):
                  input_shape: typing.Iterable[int],
                  conv_n_neurons: typing.List[int],
                  classification_n_neurons: int,
-                 conv_activation: torch.nn.Module = torch.nn.LeakyReLU(),
-                 conv_pooling: torch.nn.Module = torch.nn.MaxPool2d(2, 2),
+                 conv_activation: torch.nn.Module = torch.nn.ReLU,
+                 conv_pooling: torch.nn.Module = torch.nn.MaxPool2d,
                  back_norm: bool = True,
                  kernel_size: int = 5,
                  padding: int = None,
                  n_targets: int = 1,
                  dropout_prob: float = 0.5,
                  classification_hidden_activation: torch.nn.Module = None,
-                 classification_output_activation: torch.nn.Module = torch.nn.Sigmoid()):
+                 classification_output_activation: torch.nn.Module = None):
         super().__init__()
+
 
         classification_hidden_activation = conv_activation if classification_hidden_activation is None else classification_hidden_activation
         padding = padding if padding is not None else int((kernel_size-1)/2)
@@ -42,8 +43,8 @@ class CNN(iara_model.BaseModel):
                 conv_layers.append(torch.nn.BatchNorm2d(conv[i]))
             if dropout_prob != 0 and i != 0:
                 conv_layers.append(torch.nn.Dropout2d(p=dropout_prob))
-            conv_layers.append(conv_activation)
-            conv_layers.append(conv_pooling)
+            conv_layers.append(conv_activation())
+            conv_layers.append(conv_pooling(2,2))
 
         self.conv_layers = torch.nn.Sequential(*conv_layers)
 
@@ -56,12 +57,10 @@ class CNN(iara_model.BaseModel):
 
         test_tensor = self.to_feature_space(test_tensor)
 
-
         self.mlp = iara_mlp.MLP(input_shape = test_tensor.shape,
-                                n_neurons = classification_n_neurons,
-                                n_targets = n_targets,
-                                activation_hidden_layer = classification_hidden_activation,
-                                activation_output_layer = classification_output_activation)
+                        hidden_channels = classification_n_neurons,
+                        n_targets = n_targets,
+                        activation_output_layer = classification_output_activation)
 
 
     def to_feature_space(self, data: torch.Tensor) -> torch.Tensor:
@@ -72,12 +71,3 @@ class CNN(iara_model.BaseModel):
         data = self.to_feature_space(data)
         data = self.mlp(data)
         return data
-
-    def __str__(self) -> str:
-        """
-        Return a string representation of the model.
-
-        Returns:
-            str: A string containing the name of the model class.
-        """
-        return f'{super().__str__()} ------- \n' + f'{str(self.conv_layers)}\n' + f'{str(self.mlp)}'
