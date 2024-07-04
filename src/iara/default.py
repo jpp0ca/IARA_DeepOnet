@@ -163,7 +163,7 @@ def default_mel_managers(config_name: str,
                                 conv_activation = torch.nn.PReLU(),
                                 conv_pooling = torch.nn.AvgPool2d(2, 2),
                                 kernel_size = 3,
-                                dropout_prob = 0.4),
+                                conv_dropout = 0.4),
                     optimizer_allocator=lambda model:
                             torch.optim.Adam(model.parameters(), weight_decay=1e-3),
                     batch_size = 128)
@@ -174,7 +174,7 @@ def default_mel_managers(config_name: str,
                     trainer_id = 'forest mel',
                     n_targets = collection.target.get_n_targets(),
                     n_estimators = 200,
-                    max_depth = 10)
+                    max_depth = 20)
 
         elif classifier == Classifier.MLP:
 

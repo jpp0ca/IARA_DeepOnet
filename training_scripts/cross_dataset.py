@@ -45,7 +45,10 @@ class OtherCollections(enum.Enum):
         if self == OtherCollections.SHIPSEAR:
             classes_by_length = ['B', 'C', 'A', 'D', 'E']
             try:
-                return classes_by_length.index(df['Class'])
+                target = (classes_by_length.index(df['Class']) - 1)
+                if target < 0:
+                    return 0
+                return target
             except ValueError:
                 return np.nan
             
@@ -68,7 +71,7 @@ class OtherCollections(enum.Enum):
         collection = iara.records.CustomCollection(
                     collection = OtherCollections.SHIPSEAR,
                     target = iara.records.GenericTarget(
-                        n_targets = 5,
+                        n_targets = 4,
                         function = OtherCollections.SHIPSEAR.classify_row,
                         include_others = False
                     ),
@@ -104,7 +107,7 @@ def main(
 
 
     # classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.CNN]
-    classifiers = [iara_default.Classifier.CNN]
+    classifiers = [iara_default.Classifier.FOREST]
     eval_subsets = [iara_trn.Subset.TEST, iara_trn.Subset.ALL]
 
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/cross_dataset"
@@ -196,7 +199,7 @@ def main(
             collection = iara.records.CustomCollection(
                         collection = OtherCollections.DEEPSHIP,
                         target = iara.records.GenericTarget(
-                            n_targets = 5,
+                            n_targets = 4,
                             function = OtherCollections.DEEPSHIP.classify_row,
                             include_others = False
                         ),
@@ -251,8 +254,12 @@ def main(
 
     print("############### Deepship classification ###############")
     for (classifier, eval_strategy), cv_dict in deep_grids.items():
+        if eval_strategy != iara_trn.EvalStrategy.BY_AUDIO:
+            continue
         print(f"--------- {eval_strategy} - {classifier} ---------")
         print(cv_dict['cv'])
+        for hash, dict in cv_dict['cv'].cv_dict.items():
+            dict['cv'].print_cm(relative=False)
 
 
 if __name__ == "__main__":

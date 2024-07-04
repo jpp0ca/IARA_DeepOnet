@@ -30,6 +30,10 @@ class Metric(enum.Enum):
     MACRO_F1 = 4
     DETECTION_PROBABILITY = 5
     SP_INDEX = 6
+    MACRO_RECALL = 7
+    MICRO_RECALL = 8
+    MACRO_PRECISION = 9
+    MICRO_PRECISION = 10
 
     def __str__(self):
         """Return the string representation of the Metric enum."""
@@ -44,6 +48,10 @@ class Metric(enum.Enum):
             __class__.MACRO_F1: "F1-score",
             __class__.DETECTION_PROBABILITY: "DETECTION_PROBABILITY",
             __class__.SP_INDEX: "SP",
+            __class__.MACRO_RECALL: "Recall",
+            __class__.MICRO_RECALL: "Micro Recall",
+            __class__.MACRO_PRECISION: "Precision",
+            __class__.MICRO_PRECISION: "Micro Precision",
         }
         return en_labels[self]
 
@@ -68,6 +76,18 @@ class Metric(enum.Enum):
 
         if self == Metric.MACRO_F1:
             return sk_metrics.f1_score(target, prediction, average='macro') * 100
+
+        if self == Metric.MACRO_RECALL:
+            return sk_metrics.recall_score(target, prediction, average='macro') * 100
+
+        if self == Metric.MICRO_RECALL:
+            return sk_metrics.recall_score(target, prediction, average='micro') * 100
+
+        if self == Metric.MACRO_PRECISION:
+            return sk_metrics.precision_score(target, prediction, average='macro') * 100
+
+        if self == Metric.MICRO_PRECISION:
+            return sk_metrics.precision_score(target, prediction, average='micro') * 100
 
         if self == Metric.DETECTION_PROBABILITY:
             cm = sk_metrics.confusion_matrix(target, prediction, labels=list(set(list(target))))
@@ -268,6 +288,8 @@ class CrossValidationCompiler():
     def print_cm(self, filename: str = None, relative=True):
         dict_id = 'rel_cm' if relative else 'abs_cm'
 
+        print(self._score_dict[dict_id])
+
         num_folds = len(self._score_dict[dict_id])
         first_matrix = next(iter(self._score_dict[dict_id].values()))
         n_classes = first_matrix.shape[0]
@@ -389,7 +411,11 @@ class GridCompiler():
     """
     default_metric_list = [Metric.SP_INDEX,
                            Metric.BALANCED_ACCURACY,
-                           Metric.MACRO_F1]
+                           Metric.MACRO_F1,
+                           Metric.MACRO_RECALL,
+                           Metric.MICRO_RECALL,
+                           Metric.MACRO_PRECISION,
+                           Metric.MICRO_PRECISION]
 
     def __init__(self,
                  metric_list: typing.List[Metric] = default_metric_list,

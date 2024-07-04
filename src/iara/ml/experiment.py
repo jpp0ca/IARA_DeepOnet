@@ -394,7 +394,7 @@ class Manager():
         self.__prepare_output_dir(override=override)
         id_list = self.config.split_datasets()
 
-        # self.print_dataset_details(id_list)
+        self.print_dataset_details(id_list)
 
         df = self.config.dataset.to_df()
 

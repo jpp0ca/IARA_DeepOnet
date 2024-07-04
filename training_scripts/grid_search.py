@@ -235,7 +235,7 @@ class GridSearch():
                                     conv_pooling = pooling,
                                     kernel_size = kernel,
                                     n_targets = n_targets,
-                                    dropout_prob = dropout,
+                                    conv_dropout = dropout,
                                     classification_output_activation = out_activation),
                         optimizer_allocator=lambda model,
                             lr = param_pack[self.headers[classifier][7]],

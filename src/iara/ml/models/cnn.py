@@ -9,15 +9,19 @@ class CNN(iara_model.BaseModel):
 
     def __init__(self,
                  input_shape: typing.Iterable[int],
+
                  conv_n_neurons: typing.List[int],
-                 classification_n_neurons: int,
                  conv_activation: torch.nn.Module = torch.nn.ReLU,
                  conv_pooling: torch.nn.Module = torch.nn.MaxPool2d,
-                 back_norm: bool = True,
+                 conv_dropout: float = 0.5,
+                 batch_norm: bool = True,
                  kernel_size: int = 5,
                  padding: int = None,
+
+                 classification_n_neurons: typing.Union[int, typing.Iterable[int]] = 128,
                  n_targets: int = 1,
-                 dropout_prob: float = 0.5,
+                 classification_dropout: float = 0,
+                 classification_norm: bool = True,
                  classification_hidden_activation: torch.nn.Module = None,
                  classification_output_activation: torch.nn.Module = None):
         super().__init__()
@@ -39,10 +43,10 @@ class CNN(iara_model.BaseModel):
         for i in range(1, len(conv)):
             conv_layers.append(torch.nn.Conv2d(conv[i - 1], conv[i],
                                                kernel_size=kernel_size, padding=padding))
-            if back_norm:
+            if batch_norm:
                 conv_layers.append(torch.nn.BatchNorm2d(conv[i]))
-            if dropout_prob != 0 and i != 0:
-                conv_layers.append(torch.nn.Dropout2d(p=dropout_prob))
+            if conv_dropout != 0 and i != 0:
+                conv_layers.append(torch.nn.Dropout2d(p=conv_dropout))
             conv_layers.append(conv_activation())
             conv_layers.append(conv_pooling(2,2))
 
@@ -59,8 +63,11 @@ class CNN(iara_model.BaseModel):
 
         self.mlp = iara_mlp.MLP(input_shape = test_tensor.shape,
                         hidden_channels = classification_n_neurons,
+                        norm_layer = torch.nn.BatchNorm1d if classification_norm else None,
                         n_targets = n_targets,
-                        activation_output_layer = classification_output_activation)
+                        activation_layer = classification_hidden_activation,
+                        activation_output_layer = classification_output_activation,
+                        dropout=classification_dropout)
 
 
     def to_feature_space(self, data: torch.Tensor) -> torch.Tensor:

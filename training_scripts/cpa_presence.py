@@ -50,13 +50,11 @@ def main(override: bool,
     exp_str = 'cpa_exp' if not only_sample else 'cpa_exp_sample'
 
     result_grid = {}
-    for eval_subset, eval_strategy in itertools.product(iara_trn.Subset, iara_trn.EvalStrategy):
-        result_grid[eval_subset, eval_strategy] = iara_metrics.GridCompiler()
 
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{exp_str}/exp_{cpa_test}"
 
     # classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.MLP, iara_default.Classifier.CNN]
-    classifiers = iara_default.Classifier
+    classifiers = [iara_default.Classifier.FOREST]
 
     manager_dict_0 = iara_default.default_mel_managers(
                 config_name = f'{str(collections[0])}',
@@ -85,15 +83,19 @@ def main(override: bool,
     comparison_dir = f'{output_base_dir}/comparison'
 
     for classifier in classifiers:
-        comparator = iara_exp.CrossComparator(comparator_eval_dir = comparison_dir,
-                                              manager_a = manager_dict_0[classifier],
-                                              manager_b = manager_dict_1[classifier])
+        strategy = iara_trn.EvalStrategy.BY_WINDOW
+        for subset in [iara_trn.Subset.TEST, iara_trn.Subset.ALL]:
+            comparator = iara_exp.CrossComparator(comparator_eval_dir = comparison_dir,
+                                                manager_a = manager_dict_0[classifier],
+                                                manager_b = manager_dict_1[classifier])
 
-        result_grid = comparator.cross_compare(
-                                eval_strategy = iara_trn.EvalStrategy.BY_WINDOW,
-                                folds = folds)
+            result_grid[subset, strategy] = comparator.cross_compare(
+                                    eval_subset = subset,
+                                    eval_strategy = strategy,
+                                    folds = folds)
 
-        print(result_grid)
+            print(f'########## {subset}, {strategy} ##########')
+            print(result_grid[subset, strategy])
 
 
 if __name__ == "__main__":
