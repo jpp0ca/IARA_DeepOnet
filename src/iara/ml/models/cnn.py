@@ -12,7 +12,7 @@ class CNN(iara_model.BaseModel):
 
                  conv_n_neurons: typing.List[int],
                  conv_activation: torch.nn.Module = torch.nn.ReLU,
-                 conv_pooling: torch.nn.Module = torch.nn.MaxPool2d,
+                 conv_pooling: typing.Optional[torch.nn.Module] = torch.nn.MaxPool2d,
                  conv_dropout: float = 0.5,
                  batch_norm: bool = True,
                  kernel_size: int = 5,
@@ -48,7 +48,8 @@ class CNN(iara_model.BaseModel):
             if conv_dropout != 0 and i != 0:
                 conv_layers.append(torch.nn.Dropout2d(p=conv_dropout))
             conv_layers.append(conv_activation())
-            conv_layers.append(conv_pooling(2,2))
+            if conv_pooling is not None:
+                conv_layers.append(conv_pooling(2,2))
 
         self.conv_layers = torch.nn.Sequential(*conv_layers)
 

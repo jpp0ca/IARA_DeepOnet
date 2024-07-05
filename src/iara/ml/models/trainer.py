@@ -482,6 +482,7 @@ class OptimizerTrainer(BaseTrainer):
         plt.title('Training and Validation Loss')
         plt.tight_layout()
         plt.legend()
+        plt.grid()
         if log_scale:
             plt.semilogx()
         plt.savefig(filename)
@@ -592,7 +593,9 @@ class OptimizerTrainer(BaseTrainer):
 
                     predictions = model(samples)
 
-                    loss = loss_module(predictions, targets)
+                    hot_targets = torch.nn.functional.one_hot(targets, num_classes=self.n_targets).float()
+
+                    loss = loss_module(predictions, hot_targets)
                     loss.backward()
                     trn_batch_loss.append(loss.item())
                     running_loss.append(loss.item())
@@ -616,7 +619,9 @@ class OptimizerTrainer(BaseTrainer):
                         samples = samples.to(self.device)
                         predictions = model(samples)
 
-                        loss = loss_module(predictions, targets)
+                        hot_targets = torch.nn.functional.one_hot(targets, num_classes=self.n_targets).float()
+
+                        loss = loss_module(predictions, hot_targets)
                         running_loss.append(loss.item())
                         val_batch_loss.append(loss.item())
 

@@ -22,6 +22,17 @@ import iara.processing.analysis as iara_proc
 
 from iara.default import DEFAULT_DIRECTORIES
 
+class WeightedMSELoss(torch.nn.Module):
+    def __init__(self, weight):
+        super().__init__()
+        self.weight = weight
+
+    def forward(self, input, target):
+        mse_loss = (input - target) ** 2
+        weighted_loss = mse_loss * self.weight[target.long()]
+        loss = torch.mean(weighted_loss)
+        return loss
+
 def main(folds: typing.List[int]):
 
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/tests"
@@ -29,12 +40,12 @@ def main(folds: typing.List[int]):
 
     grid = iara_metrics.GridCompiler()
 
-    input_type = iara_dataset.InputType.Image(n_windows=32, overlap=0.5)
+    input_type = iara_dataset.InputType.Image(n_windows=32, overlap=0)
 
     dp = iara_manager.AudioFileProcessor(
         data_base_dir = directories.data_dir,
         data_processed_base_dir = directories.process_dir,
-        normalization = iara_proc.Normalization.MIN_MAX,
+        normalization = iara_proc.Normalization.NORM_L2,
         analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
         n_pts = 1024,
         n_overlap = 0,
@@ -55,14 +66,14 @@ def main(folds: typing.List[int]):
             training_strategy=iara_trn.ModelTrainingStrategy.MULTICLASS,
             trainer_id = 'cnn',
             n_targets = config.dataset.target.get_n_targets(),
-            batch_size = 128,
+            batch_size = 32,
             n_epochs = 512,
             patience = 16,
             model_allocator = lambda input_shape, n_targets:
                     iara_cnn.CNN(
                             input_shape = input_shape,
 
-                            conv_n_neurons = [16, 32, 64, 128],
+                            conv_n_neurons = [128, 64],
                             conv_activation = torch.nn.ReLU,
                             conv_pooling = torch.nn.MaxPool2d,
                             conv_dropout = 0.4,
@@ -70,36 +81,39 @@ def main(folds: typing.List[int]):
                             kernel_size = 5,
                             padding = None,
 
-                            classification_n_neurons = 128,
+                            classification_n_neurons = [128],
                             n_targets = n_targets,
-                            classification_dropout = 0,
+                            classification_dropout = 0.4,
                             classification_norm = False,
                             classification_hidden_activation = torch.nn.ReLU,
-                            classification_output_activation = torch.nn.ReLU
+                            classification_output_activation = torch.nn.Sigmoid
                     ),
             optimizer_allocator=lambda model:
                     torch.optim.Adam(
                             model.parameters(),
                             weight_decay = 1e-3,
-                            lr = 1e-6),
+                            lr = 1e-5),
             loss_allocator = lambda class_weights:
-                    torch.nn.CrossEntropyLoss(
-                            weight=class_weights,
-                            reduction='mean')
+                    torch.nn.CrossEntropyLoss(weight=class_weights, reduction='mean')
+                    # torch.nn.MSELoss()
+                    # WeightedMSELoss(class_weights)
             ))
 
     manager = iara_exp.Manager(config, *trainers)
 
     result_grid = manager.run(folds = folds, override=True)
 
-    for (eval_subset, _), result_dict in result_grid.items():
+    for (eval_subset, eval_strategy), result_dict in result_grid.items():
+        if eval_subset == iara_trn.Subset.ALL:
+            continue
 
         for trainer_id, results in result_dict.items():
 
             for i_fold, result in enumerate(results):
 
                 grid.add(params = {
-                                'trainer_id': trainer_id,
+                                'eval_strategy': eval_strategy,
+                                # 'trainer_id': trainer_id,
                                 'eval_subset': eval_subset,
                             },
                             i_fold=i_fold,

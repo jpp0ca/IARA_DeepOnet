@@ -39,8 +39,8 @@ class GridSearch():
         }
         self.complete_grid = {
             iara_default.Classifier.FOREST: {
-                self.headers[iara_default.Classifier.FOREST][0]: [50, 150, 250],
-                self.headers[iara_default.Classifier.FOREST][1]: [5, 10, 15]
+                self.headers[iara_default.Classifier.FOREST][0]: [100, 200, 300, 500],
+                self.headers[iara_default.Classifier.FOREST][1]: [5, 10, 20, 30]
             },
             iara_default.Classifier.MLP: {
                 self.headers[iara_default.Classifier.MLP][0]: [64, 128, 256, 1024],
@@ -50,17 +50,25 @@ class GridSearch():
                 self.headers[iara_default.Classifier.MLP][4]: [0, 1e-3, 1e-5]
             },
             iara_default.Classifier.CNN: {
-                self.headers[iara_default.Classifier.CNN][0]: ['16, 32, 64',
-                                                               '16, 32, 64, 128',
-                                                               '32, 64, 128, 256'],
-                self.headers[iara_default.Classifier.CNN][1]: [256, 1024, 2048],
+                # self.headers[iara_default.Classifier.CNN][0]: ['32, 256',
+                #                                                '128, 512',
+                #                                                '512, 128',
+                #                                                '16, 32, 128'],
+                self.headers[iara_default.Classifier.CNN][0]: ['32, 256',
+                                                               '128, 512',
+                                                               '512, 128',
+                                                               '512, 512',
+                                                               '256, 32',
+                                                               '16, 32, 128',
+                                                               '128, 32, 16'],
+                self.headers[iara_default.Classifier.CNN][1]: [64, 256, 1024, 2048],
                 self.headers[iara_default.Classifier.CNN][2]: ['ReLU', 'PReLU', 'LeakyReLU'],
-                self.headers[iara_default.Classifier.CNN][3]: ['Max', 'Avg'],
+                self.headers[iara_default.Classifier.CNN][3]: ['Avg','Max'],
                 self.headers[iara_default.Classifier.CNN][4]: [3, 5, 7],
-                self.headers[iara_default.Classifier.CNN][5]: [0, 0.2, 0.4, 0.6],
+                self.headers[iara_default.Classifier.CNN][5]: [0.2, 0.4, 0.6],
                 self.headers[iara_default.Classifier.CNN][6]: ['Sigmoid', 'ReLU', 'Linear'],
-                self.headers[iara_default.Classifier.CNN][7]: [1e-3, 1e-4, 1e-5],
-                self.headers[iara_default.Classifier.CNN][8]: [0, 1e-3, 1e-5],
+                self.headers[iara_default.Classifier.CNN][7]: [1e-5, 1e-6, 1e-7],
+                self.headers[iara_default.Classifier.CNN][8]: [1e-2, 1e-3, 1e-5, 0],
             }
         }
         self.small_grid = {
@@ -77,21 +85,21 @@ class GridSearch():
                     self.headers[iara_default.Classifier.MLP][4]: [1e-3]
                 },
                 iara_default.Classifier.CNN: {
-                    self.headers[iara_default.Classifier.CNN][0]: ['16, 64, 128, 512'],
+                    self.headers[iara_default.Classifier.CNN][0]: ['32, 256'],
                     self.headers[iara_default.Classifier.CNN][1]: [256],
-                    self.headers[iara_default.Classifier.CNN][2]: ['ReLU'],
-                    self.headers[iara_default.Classifier.CNN][3]: ['Avg'],
+                    self.headers[iara_default.Classifier.CNN][2]: ['PReLU'],
+                    self.headers[iara_default.Classifier.CNN][3]: ['Max'],
                     self.headers[iara_default.Classifier.CNN][4]: [5],
                     self.headers[iara_default.Classifier.CNN][5]: [0.4],
                     self.headers[iara_default.Classifier.CNN][6]: ['Linear'],
-                    self.headers[iara_default.Classifier.CNN][7]: [1e-4],
+                    self.headers[iara_default.Classifier.CNN][7]: [1e-6],
                     self.headers[iara_default.Classifier.CNN][8]: [1e-3],
                 }
             },
             Feature.LOFAR: {
                 iara_default.Classifier.FOREST: {
-                    self.headers[iara_default.Classifier.FOREST][0]: [200],
-                    self.headers[iara_default.Classifier.FOREST][1]: [10]
+                    self.headers[iara_default.Classifier.FOREST][0]: [300],
+                    self.headers[iara_default.Classifier.FOREST][1]: [20]
                 },
                 iara_default.Classifier.MLP: {
                     self.headers[iara_default.Classifier.MLP][0]: [128],
@@ -101,14 +109,14 @@ class GridSearch():
                     self.headers[iara_default.Classifier.MLP][4]: [1e-3]
                 },
                 iara_default.Classifier.CNN: {
-                    self.headers[iara_default.Classifier.CNN][0]: ['16, 32, 64, 128'],
+                    self.headers[iara_default.Classifier.CNN][0]: ['16, 32, 64, 256'],
                     self.headers[iara_default.Classifier.CNN][1]: [256],
-                    self.headers[iara_default.Classifier.CNN][2]: ['ReLU'],
-                    self.headers[iara_default.Classifier.CNN][3]: ['Avg'],
-                    self.headers[iara_default.Classifier.CNN][4]: [3],
+                    self.headers[iara_default.Classifier.CNN][2]: ['PReLU'],
+                    self.headers[iara_default.Classifier.CNN][3]: ['Max'],
+                    self.headers[iara_default.Classifier.CNN][4]: [5],
                     self.headers[iara_default.Classifier.CNN][5]: [0.4],
-                    self.headers[iara_default.Classifier.CNN][6]: ['Sigmoid'],
-                    self.headers[iara_default.Classifier.CNN][7]: [1e-5],
+                    self.headers[iara_default.Classifier.CNN][6]: ['Linear'],
+                    self.headers[iara_default.Classifier.CNN][7]: [1e-6],
                     self.headers[iara_default.Classifier.CNN][8]: [1e-3],
                 }
             }
@@ -218,7 +226,7 @@ class GridSearch():
                         training_strategy=training_strategy,
                         trainer_id = trainer_id,
                         n_targets = config.dataset.target.get_n_targets(),
-                        batch_size = 128,
+                        batch_size = 64,
                         model_allocator = lambda input_shape, n_targets,
                             conv_neurons = conv_n_neurons,
                             class_neurons = param_pack[self.headers[classifier][1]],
@@ -240,7 +248,7 @@ class GridSearch():
                         optimizer_allocator=lambda model,
                             lr = param_pack[self.headers[classifier][7]],
                             weight_decay = param_pack[self.headers[classifier][8]]:
-                                torch.optim.Adam(model.parameters(), weight_decay = weight_decay)))
+                                torch.optim.Adam(model.parameters(), lr = lr, weight_decay = weight_decay)))
 
             else:
                 raise NotImplementedError(
@@ -350,7 +358,7 @@ def main(classifier: iara_default.Classifier,
                                 prediction=result['Prediction'])
 
     for (eval_subset, eval_strategy), grid_compiler in result_grid.items():
-        if eval_subset == iara_trn.Subset.TEST:
+        if eval_subset == iara_trn.Subset.ALL:
             continue
         print(f'########## {eval_subset} - {eval_strategy} ############')
         print(grid_compiler)
@@ -365,7 +373,7 @@ def main(classifier: iara_default.Classifier,
             # result_grid[iara_trn.Subset.TEST, eval_strategy].export(f'{filename}.tex')
             result_grid[iara_trn.Subset.TEST, eval_strategy].export(f'{filename}.pkl')
 
-    params, cv = result_grid[iara_trn.Subset.TEST, iara_trn.EvalStrategy.BY_WINDOW].get_best()
+    params, cv = result_grid[iara_trn.Subset.TEST, iara_trn.EvalStrategy.BY_AUDIO].get_best()
     print('########## Best Parameters ############')
     print(params, " --- ", cv)
 

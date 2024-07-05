@@ -23,7 +23,7 @@ class RandomForestModel(iara_model.BaseModel):
         self.random_forest = sk_ensemble.RandomForestClassifier(n_estimators=n_estimators,
                                                                 max_depth=max_depth,
                                                                 random_state=42,
-                                                                n_jobs=8,
+                                                                n_jobs=40,
                                                                 class_weight='balanced')
 
     def forward(self, data: torch.Tensor) -> torch.Tensor:
