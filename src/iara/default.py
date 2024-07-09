@@ -65,7 +65,7 @@ def default_iara_lofar_audio_processor(directories: Directories = DEFAULT_DIRECT
     return iara_manager.AudioFileProcessor(
         data_base_dir = directories.data_dir,
         data_processed_base_dir = directories.process_dir,
-        normalization = iara_proc.Normalization.MIN_MAX,
+        normalization = iara_proc.Normalization.NORM_L2,
         analysis = iara_proc.SpectralAnalysis.LOFAR,
         n_pts = 1024,
         n_overlap = 0,
@@ -79,7 +79,7 @@ def default_iara_mel_audio_processor(directories: Directories = DEFAULT_DIRECTOR
     return iara_manager.AudioFileProcessor(
         data_base_dir = directories.data_dir,
         data_processed_base_dir = directories.process_dir,
-        normalization = iara_proc.Normalization.MIN_MAX,
+        normalization = iara_proc.Normalization.NORM_L2,
         analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
         n_pts = 1024,
         n_overlap = 0,

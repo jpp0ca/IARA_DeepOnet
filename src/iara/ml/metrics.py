@@ -429,6 +429,17 @@ class GridCompiler():
     def is_empty(self) -> bool:
         return self.params == None
 
+    @staticmethod
+    def calc_hash(params: typing.Dict) -> str:
+        correct_params = {}
+        for key, value in params.items():
+            if isinstance(value, list):
+                correct_params[key] = ', '.join([str(v) for v in value])
+            else:
+                correct_params[key] = value
+
+        return hash(tuple(correct_params.items()))
+
     def add(self,
             params: typing.Dict,
             i_fold: int,
@@ -443,7 +454,7 @@ class GridCompiler():
             target (Iterable[int]): True labels.
             prediction (Iterable[int]): Predicted labels.
         """
-        params_hash = hash(tuple(params.items()))
+        params_hash = GridCompiler.calc_hash(params)
         self.params = params.keys()
 
         if not params_hash in self.cv_dict:
@@ -461,7 +472,7 @@ class GridCompiler():
     def add_cv(self,
             params: typing.Dict,
             cv: CrossValidationCompiler):
-        params_hash = hash(tuple(params.items()))
+        params_hash = GridCompiler.calc_hash(params)
         self.params = params.keys()
 
         if not params_hash in self.cv_dict:
@@ -498,7 +509,7 @@ class GridCompiler():
         return df
     
     def get_metric_list(self, params: typing.Dict, metric: Metric):
-        params_hash = hash(tuple(params.items()))
+        params_hash = GridCompiler.calc_hash(params)
         return self.cv_dict[params_hash]['cv'].get(metric)
     
     def get_best(self, metric: Metric = Metric.SP_INDEX):
@@ -517,7 +528,7 @@ class GridCompiler():
         return best_cv['params'], best_cv['cv']
 
     def get_cv(self, params: typing.Dict):
-        params_hash = hash(tuple(params.items()))
+        params_hash = GridCompiler.calc_hash(params)
         return self.cv_dict[params_hash]['cv']
 
     def print_best_cm(self, filename: str = None, metric: Metric = Metric.SP_INDEX, relative=True):
