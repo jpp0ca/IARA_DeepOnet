@@ -20,6 +20,18 @@ import iara.processing.manager as iara_manager
 
 from iara.default import DEFAULT_DIRECTORIES
 
+
+class WeightedMSELoss(torch.nn.Module):
+    def __init__(self, class_weight):
+        super().__init__()
+        self.class_weight = class_weight
+
+    def forward(self, input, target):
+        mse_loss = (input - target) ** 2
+        weighted_loss = mse_loss * self.class_weight[target.long()]
+        loss = torch.mean(weighted_loss)
+        return loss
+
 class GridSearch():
 
     def __init__(self) -> None:
@@ -129,8 +141,8 @@ class GridSearch():
                     self.headers[iara_default.Classifier.FOREST][1]: [0, 1, 2, 3] #Max depth
                 },
                 iara_default.Classifier.MLP: {
-                    self.headers[iara_default.Classifier.MLP][0]: [1, 2, 3],      #Batch
-                    self.headers[iara_default.Classifier.MLP][1]: [1, 3, 5, 7, 9],#hidden_channels
+                    self.headers[iara_default.Classifier.MLP][0]: [0, 1, 2],      #Batch
+                    self.headers[iara_default.Classifier.MLP][1]: [0, 1, 3, 5, 7, 9],#hidden_channels
                     self.headers[iara_default.Classifier.MLP][2]: [0, 1, 2],      #dropout
                     self.headers[iara_default.Classifier.MLP][3]: [0, 1, 2],      #norm_layer
                     self.headers[iara_default.Classifier.MLP][4]: [0, 1, 2],      #activation_layer
@@ -198,12 +210,12 @@ class GridSearch():
         self.small_grid = {
             Feature.MEL: {
                 iara_default.Classifier.FOREST: {
-                    self.headers[iara_default.Classifier.FOREST][0]: [4],         #Estimators
+                    self.headers[iara_default.Classifier.FOREST][0]: [1],         #Estimators
                     self.headers[iara_default.Classifier.FOREST][1]: [2]          #Max depth
                 },
                 iara_default.Classifier.MLP: {
                     self.headers[iara_default.Classifier.MLP][0]: [2],            #Batch
-                    self.headers[iara_default.Classifier.MLP][1]: [3],            #hidden_channels
+                    self.headers[iara_default.Classifier.MLP][1]: [1],            #hidden_channels
                     self.headers[iara_default.Classifier.MLP][2]: [2],            #dropout
                     self.headers[iara_default.Classifier.MLP][3]: [2],            #norm_layer
                     self.headers[iara_default.Classifier.MLP][4]: [0],            #activation_layer
