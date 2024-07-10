@@ -83,19 +83,20 @@ def main(override: bool,
     comparison_dir = f'{output_base_dir}/comparison'
 
     for classifier in classifiers:
-        strategy = iara_trn.EvalStrategy.BY_WINDOW
-        for subset in [iara_trn.Subset.TEST, iara_trn.Subset.ALL]:
-            comparator = iara_exp.CrossComparator(comparator_eval_dir = comparison_dir,
-                                                manager_a = manager_dict_0[classifier],
-                                                manager_b = manager_dict_1[classifier])
+        # strategy = iara_trn.EvalStrategy.BY_WINDOW
+        for strategy in iara_trn.EvalStrategy:
+            for subset in [iara_trn.Subset.TEST, iara_trn.Subset.ALL]:
+                comparator = iara_exp.CrossComparator(comparator_eval_dir = comparison_dir,
+                                                    manager_a = manager_dict_0[classifier],
+                                                    manager_b = manager_dict_1[classifier])
 
-            result_grid[subset, strategy] = comparator.cross_compare(
-                                    eval_subset = subset,
-                                    eval_strategy = strategy,
-                                    folds = folds)
+                result_grid[subset, strategy] = comparator.cross_compare(
+                                        eval_subset = subset,
+                                        eval_strategy = strategy,
+                                        folds = folds)
 
-            print(f'########## {subset}, {strategy} ##########')
-            print(result_grid[subset, strategy])
+                print(f'########## {subset}, {strategy} ##########')
+                print(result_grid[subset, strategy])
 
 
 if __name__ == "__main__":

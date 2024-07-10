@@ -8,11 +8,15 @@ import argparse
 import numpy as np
 import typing
 
+import torch
+
 import iara.records
 import iara.ml.experiment as iara_exp
 import iara.ml.models.trainer as iara_trn
 import iara.ml.metrics as iara_metrics
 import iara.ml.dataset as iara_dataset
+import iara.ml.models.cnn as iara_cnn
+import iara.ml.models.mlp as iara_mlp
 import iara.processing.analysis as iara_proc
 import iara.processing.manager as iara_manager
 
@@ -64,7 +68,7 @@ class OtherCollections(enum.Enum):
         if self != OtherCollections.SHIPSEAR:
             raise NotImplementedError(f'default_mel_managers not implemented for {self}')
 
-        shipsear_name = f'shipsear'
+        config_name = 'shipsear'
         data_base_dir = "./data/shipsear_16e3"
         data_processed_base_dir = "./data/shipsear_processed"
 
@@ -81,7 +85,7 @@ class OtherCollections(enum.Enum):
         dataset_processor = iara_manager.AudioFileProcessor(
                 data_base_dir = data_base_dir,
                 data_processed_base_dir = data_processed_base_dir,
-                normalization = iara_proc.Normalization.MIN_MAX,
+                normalization = iara_proc.Normalization.NORM_L2,
                 analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
                 n_pts = 1024,
                 n_overlap = 0,
@@ -91,12 +95,65 @@ class OtherCollections(enum.Enum):
                 extract_id = OtherCollections.SHIPSEAR.get_id
             )
 
-        return iara_default.default_mel_managers(config_name = shipsear_name,
+        manager_dict = {}
+
+        for classifier in classifiers:
+
+            input = classifier.get_input_type()
+
+            config = iara_exp.Config(
+                            name = f'{config_name}_{input.type_str()}',
+                            dataset = collection,
+                            dataset_processor = dataset_processor,
                             output_base_dir = output_base_dir,
-                            classifiers = classifiers,
-                            collection = collection,
-                            data_processor = dataset_processor,
-                            training_strategy = training_strategy)
+                            input_type = input)
+        
+            if classifier == iara_default.Classifier.CNN:
+
+                trainer = iara_trn.OptimizerTrainer(
+                        training_strategy=training_strategy,
+                        trainer_id = 'cnn mel',
+                        n_targets = collection.target.get_n_targets(),
+                        model_allocator=lambda input_shape, n_targets:
+                                iara_cnn.CNN(
+                                    input_shape=input_shape,
+                                    n_targets = n_targets,
+                                    conv_n_neurons = [16, 32, 64, 128],
+                                    classification_n_neurons = 128,
+                                    conv_activation = torch.nn.PReLU(),
+                                    conv_pooling = torch.nn.AvgPool2d(2, 2),
+                                    kernel_size = 3,
+                                    conv_dropout = 0.4),
+                        optimizer_allocator=lambda model:
+                                torch.optim.Adam(model.parameters(), weight_decay=1e-3),
+                        batch_size = 128)
+
+            elif classifier == iara_default.Classifier.FOREST:
+                trainer = iara_trn.RandomForestTrainer(
+                        training_strategy=training_strategy,
+                        trainer_id = 'forest mel',
+                        n_targets = collection.target.get_n_targets(),
+                        n_estimators = 8,
+                        max_depth = 5)
+
+            elif classifier == iara_default.Classifier.MLP:
+
+                trainer = iara_trn.OptimizerTrainer(
+                        training_strategy=training_strategy,
+                        trainer_id = 'mlp mel',
+                        n_targets = collection.target.get_n_targets(),
+                        batch_size=1024,
+                        model_allocator=lambda input_shape, n_targets:
+                                iara_mlp.MLP(input_shape=input_shape,
+                                    n_neurons=128,
+                                    n_targets=n_targets,
+                                    activation_hidden_layer=torch.nn.PReLU()),
+                        optimizer_allocator=lambda model:
+                            torch.optim.Adam(model.parameters(), weight_decay=1e-5))
+
+            manager_dict[classifier] = iara_exp.Manager(config, trainer)
+
+        return manager_dict
 
 
 def main(
