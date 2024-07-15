@@ -169,7 +169,7 @@ class Config:
     def __eq__(self, other):
         if isinstance(other, Config):
             return (self.name == other.name and
-                    self.dataset == other.dataset and
+                    # self.dataset == other.dataset and
                     self.dataset_processor == other.dataset_processor and
                     self.input_type == other.input_type and
                     self.output_base_dir == other.output_base_dir and

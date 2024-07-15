@@ -153,28 +153,56 @@ def default_mel_managers(config_name: str,
             trainer = iara_trn.OptimizerTrainer(
                     training_strategy=training_strategy,
                     trainer_id = 'cnn mel',
-                    n_targets = collection.target.get_n_targets(),
-                    model_allocator=lambda input_shape, n_targets:
+                    n_targets = config.dataset.target.get_n_targets(),
+                    batch_size = 32,
+                    model_allocator = lambda input_shape, n_targets,
+                        conv_n_neurons = [1024, 128],
+                        conv_activation = torch.nn.LeakyReLU,
+                        conv_pooling = torch.nn.MaxPool2d,
+                        conv_pooling_size = [2,2],
+                        conv_dropout = 0.4,
+                        batch_norm = torch.nn.BatchNorm2d,
+                        kernel_size = 5,
+
+                        classification_n_neurons = 128,
+                        classification_dropout = 0.4,
+                        classification_norm = None,
+                        classification_hidden_activation = torch.nn.ReLU,
+                        classification_output_activation = torch.nn.Sigmoid:
+
                             iara_cnn.CNN(
-                                input_shape=input_shape,
-                                n_targets = n_targets,
-                                conv_n_neurons = [16, 32, 64, 128],
-                                classification_n_neurons = 128,
-                                conv_activation = torch.nn.PReLU(),
-                                conv_pooling = torch.nn.AvgPool2d(2, 2),
-                                kernel_size = 3,
-                                conv_dropout = 0.4),
-                    optimizer_allocator=lambda model:
-                            torch.optim.Adam(model.parameters(), weight_decay=1e-3),
-                    batch_size = 128)
+                                    input_shape = input_shape,
+
+                                    conv_n_neurons = conv_n_neurons,
+                                    conv_activation = conv_activation,
+                                    conv_pooling = conv_pooling,
+                                    conv_pooling_size = conv_pooling_size,
+                                    conv_dropout = conv_dropout,
+                                    batch_norm = batch_norm,
+                                    kernel_size = kernel_size,
+
+                                    classification_n_neurons = classification_n_neurons,
+                                    n_targets = n_targets,
+                                    classification_dropout = classification_dropout,
+                                    classification_norm = classification_norm,
+                                    classification_hidden_activation = classification_hidden_activation,
+                                    classification_output_activation = classification_output_activation,
+                            ),
+                    optimizer_allocator=lambda model,
+                        weight_decay = 1e-3,
+                        lr = 1e-6:
+                            torch.optim.Adam(model.parameters(), weight_decay = weight_decay, lr = lr),
+                    loss_allocator = lambda class_weights:
+                            torch.nn.CrossEntropyLoss(weight=class_weights, reduction='mean')
+                    )
 
         elif classifier == Classifier.FOREST:
             trainer = iara_trn.RandomForestTrainer(
                     training_strategy=training_strategy,
                     trainer_id = 'forest mel',
                     n_targets = collection.target.get_n_targets(),
-                    n_estimators = 200,
-                    max_depth = 20)
+                    n_estimators = 50,
+                    max_depth = 30)
 
         elif classifier == Classifier.MLP:
 

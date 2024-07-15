@@ -229,7 +229,8 @@ class AudioDataset(BaseDataset):
                  file_ids: typing.Iterable[int]) -> None:
         self.loader = loader
         self.input_type = input_type
-        self.file_ids = file_ids
+        # self.file_ids = file_ids
+        self.file_ids = []
         self.limit_ids = [0]
 
         self.target_tensor = None
@@ -237,9 +238,13 @@ class AudioDataset(BaseDataset):
 
         loader.pre_load(file_ids)
 
-        for file_id in self.file_ids:
+        for file_id in file_ids:
             qty_windows = input_type.to_n_samples(loader.size_map[file_id])
-            self.limit_ids.append(self.limit_ids[-1] + qty_windows)
+            # self.limit_ids.append(self.limit_ids[-1] + qty_windows)
+
+            if qty_windows > 0:
+                self.limit_ids.append(self.limit_ids[-1] + qty_windows)
+                self.file_ids.append(file_id)
 
     def __len__(self):
         return self.limit_ids[-1]

@@ -10,7 +10,8 @@ from iara.default import DEFAULT_DIRECTORIES
 import grid_search
 
 training_strategy = iara_trn.ModelTrainingStrategy.MULTICLASS
-grid_str = 'grid_search'
+grid_str = 'shipsear_grid'
+# grid_str = 'grid_search'
 output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{grid_str}"
 
 result_dict = {}

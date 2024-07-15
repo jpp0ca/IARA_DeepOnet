@@ -65,6 +65,7 @@ class OtherCollections(enum.Enum):
                          output_base_dir: str,
                          classifiers: typing.List[iara_default.Classifier],
                          training_strategy: iara_trn.ModelTrainingStrategy = iara_trn.ModelTrainingStrategy.MULTICLASS):
+
         if self != OtherCollections.SHIPSEAR:
             raise NotImplementedError(f'default_mel_managers not implemented for {self}')
 
@@ -113,20 +114,48 @@ class OtherCollections(enum.Enum):
                 trainer = iara_trn.OptimizerTrainer(
                         training_strategy=training_strategy,
                         trainer_id = 'cnn mel',
-                        n_targets = collection.target.get_n_targets(),
-                        model_allocator=lambda input_shape, n_targets:
+                        n_targets = config.dataset.target.get_n_targets(),
+                        batch_size = 32,
+                        model_allocator = lambda input_shape, n_targets,
+                            conv_n_neurons = [256, 32],
+                            conv_activation = torch.nn.PReLU,
+                            conv_pooling = torch.nn.MaxPool2d,
+                            conv_pooling_size = [2,2],
+                            conv_dropout = 0.2,
+                            batch_norm = torch.nn.BatchNorm2d,
+                            kernel_size = 7,
+
+                            classification_n_neurons = [64, 32],
+                            classification_dropout = 0,
+                            classification_norm = None,
+                            classification_hidden_activation = torch.nn.ReLU,
+                            classification_output_activation = torch.nn.Sigmoid:
+
                                 iara_cnn.CNN(
-                                    input_shape=input_shape,
-                                    n_targets = n_targets,
-                                    conv_n_neurons = [16, 32, 64, 128],
-                                    classification_n_neurons = 128,
-                                    conv_activation = torch.nn.PReLU(),
-                                    conv_pooling = torch.nn.AvgPool2d(2, 2),
-                                    kernel_size = 3,
-                                    conv_dropout = 0.4),
-                        optimizer_allocator=lambda model:
-                                torch.optim.Adam(model.parameters(), weight_decay=1e-3),
-                        batch_size = 128)
+                                        input_shape = input_shape,
+
+                                        conv_n_neurons = conv_n_neurons,
+                                        conv_activation = conv_activation,
+                                        conv_pooling = conv_pooling,
+                                        conv_pooling_size = conv_pooling_size,
+                                        conv_dropout = conv_dropout,
+                                        batch_norm = batch_norm,
+                                        kernel_size = kernel_size,
+
+                                        classification_n_neurons = classification_n_neurons,
+                                        n_targets = n_targets,
+                                        classification_dropout = classification_dropout,
+                                        classification_norm = classification_norm,
+                                        classification_hidden_activation = classification_hidden_activation,
+                                        classification_output_activation = classification_output_activation,
+                                ),
+                        optimizer_allocator=lambda model,
+                            weight_decay = 1e-3,
+                            lr = 1e-5:
+                                torch.optim.Adam(model.parameters(), weight_decay = weight_decay, lr = lr),
+                        loss_allocator = lambda class_weights:
+                                torch.nn.CrossEntropyLoss(weight=class_weights, reduction='mean')
+                        )
 
             elif classifier == iara_default.Classifier.FOREST:
                 trainer = iara_trn.RandomForestTrainer(
@@ -163,21 +192,18 @@ def main(
          override: bool):
 
 
-    # classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.CNN]
-    classifiers = [iara_default.Classifier.FOREST]
+    classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.CNN]
+    # classifiers = [iara_default.Classifier.FOREST]
     eval_subsets = [iara_trn.Subset.TEST, iara_trn.Subset.ALL]
 
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/cross_dataset"
     comparison_dir = f'{output_base_dir}/comparison'
-    deep_comparison_dir = f'{output_base_dir}/deep_comparison'
     grids_dir = f'{output_base_dir}/grids'
 
     os.makedirs(grids_dir, exist_ok=True)
 
     cross_grids = {}
     cross_incomplete = False
-    deep_grids = {}
-    deep_incomplete = False
     for classifier in classifiers:
         for subset in eval_subsets:
             cross_grids[subset, classifier] = {
@@ -188,18 +214,6 @@ def main(
                 cross_grids[subset, classifier]['cv'] = iara_metrics.GridCompiler.load(cross_grids[subset, classifier]['filename'])
             else:
                 cross_incomplete = True
-
-        for eval_strategy in [iara_trn.EvalStrategy.BY_WINDOW, iara_trn.EvalStrategy.BY_AUDIO]:
-
-            deep_grids[classifier, eval_strategy] = {
-                'filename': f'{grids_dir}/deepship_{classifier}_{eval_strategy}.pkl',
-                'cv': None
-            }
-            if os.path.exists(deep_grids[classifier, eval_strategy]['filename']):
-                deep_grids[classifier, eval_strategy]['cv'] = iara_metrics.GridCompiler.load(deep_grids[classifier, eval_strategy]['filename'])
-            else:
-                deep_incomplete = True
-
 
     iara_name = f'iara'
 
@@ -222,101 +236,35 @@ def main(
     id_listB = manager_dict_shipsear[classifiers[-1]].config.split_datasets()
     manager_dict_shipsear[classifiers[-1]].print_dataset_details(id_listB)
 
-
-    if deep_incomplete or cross_incomplete:
+    if cross_incomplete:
 
         if not only_eval:
 
+            print("############ Training IARA ############")
             for _, manager in manager_dict_iara.items():
                 manager.run(folds = folds, override = override, without_ret = True)
 
+            print("############ Training ShipsEar ############")
             for _, manager in manager_dict_shipsear.items():
                 manager.run(folds = folds, override = override, without_ret = True)
 
-        if cross_incomplete:
-            for eval_subsets in eval_subsets:
-                for classifier in classifiers:
-                    comparator = iara_exp.CrossComparator(comparator_eval_dir = comparison_dir,
-                                                        manager_a = manager_dict_iara[classifier],
-                                                        manager_b = manager_dict_shipsear[classifier])
+        for eval_subsets in eval_subsets:
+            for classifier in classifiers:
+                comparator = iara_exp.CrossComparator(comparator_eval_dir = comparison_dir,
+                                                    manager_a = manager_dict_iara[classifier],
+                                                    manager_b = manager_dict_shipsear[classifier])
 
-                    cross_grids[eval_subsets, classifier]['cv'] = comparator.cross_compare(
-                                            eval_strategy = iara_trn.EvalStrategy.BY_WINDOW,
-                                            folds = folds,
-                                            eval_subset=eval_subsets)
-                    
-                    cross_grids[eval_subsets, classifier]['cv'].export(cross_grids[eval_subsets, classifier]['filename'])
+                cross_grids[eval_subsets, classifier]['cv'] = comparator.cross_compare(
+                                        eval_strategy = iara_trn.EvalStrategy.BY_AUDIO,
+                                        folds = folds,
+                                        eval_subset=eval_subsets)
 
-
-        if deep_incomplete:
-
-            data_base_dir = "./data/deepship"
-            data_processed_base_dir = "./data/deepship_processed"
-
-            collection = iara.records.CustomCollection(
-                        collection = OtherCollections.DEEPSHIP,
-                        target = iara.records.GenericTarget(
-                            n_targets = 4,
-                            function = OtherCollections.DEEPSHIP.classify_row,
-                            include_others = False
-                        ),
-                        only_sample=False
-                    )
-
-            dataset_processor = iara_manager.AudioFileProcessor(
-                    data_base_dir = data_base_dir,
-                    data_processed_base_dir = data_processed_base_dir,
-                    normalization = iara_proc.Normalization.MIN_MAX,
-                    analysis = iara_proc.SpectralAnalysis.LOG_MELGRAM,
-                    n_pts = 1024,
-                    n_overlap = 0,
-                    decimation_rate = 2,
-                    n_mels=256,
-                    integration_interval=0.512,
-                    extract_id = OtherCollections.DEEPSHIP.get_id
-                )
-
-            df = collection.to_df()
-            print(collection.to_compiled_df())
-
-            loader = iara_dataset.ExperimentDataLoader(
-                            processor = dataset_processor,
-                            file_ids = df['ID'].to_list(),
-                            targets = df['Target'].to_list())
-
-            for eval_strategy in [iara_trn.EvalStrategy.BY_WINDOW, iara_trn.EvalStrategy.BY_AUDIO]:
-                for classifier in classifiers:
-
-                    dataset = iara_dataset.AudioDataset(
-                                loader = loader,
-                                input_type = classifier.get_input_type(),
-                                file_ids = df['ID'].to_list())
-
-                    comparator = iara_exp.CrossComparator(comparator_eval_dir = deep_comparison_dir,
-                                                        manager_a = manager_dict_iara[classifier],
-                                                        manager_b = manager_dict_shipsear[classifier])
-
-                    deep_grids[classifier, eval_strategy]['cv'] = comparator.cross_compare_outsource(dataset = dataset,
-                                    eval_strategy = eval_strategy,
-                                    folds = folds)
-
-                    deep_grids[classifier, eval_strategy]['cv'].export(deep_grids[classifier, eval_strategy]['filename'])
-
+                cross_grids[eval_subsets, classifier]['cv'].export(cross_grids[eval_subsets, classifier]['filename'])
 
     print("############### Cross comparison ###############")
     for (subset, classifier), cv_dict in cross_grids.items():
         print(f"--------- {subset} - {classifier} ---------")
         print(cv_dict['cv'])
-
-
-    print("############### Deepship classification ###############")
-    for (classifier, eval_strategy), cv_dict in deep_grids.items():
-        if eval_strategy != iara_trn.EvalStrategy.BY_AUDIO:
-            continue
-        print(f"--------- {eval_strategy} - {classifier} ---------")
-        print(cv_dict['cv'])
-        for hash, dict in cv_dict['cv'].cv_dict.items():
-            dict['cv'].print_cm(relative=False)
 
 
 if __name__ == "__main__":
@@ -344,7 +292,7 @@ if __name__ == "__main__":
         index = strategy_choises.index(args.training_strategy)
         strategies.append(iara_trn.ModelTrainingStrategy(index))
     else:
-        strategies = iara_trn.ModelTrainingStrategy
+        strategies = [iara_trn.ModelTrainingStrategy.MULTICLASS]
 
     for strategy in strategies:
         main(training_strategy = strategy,
