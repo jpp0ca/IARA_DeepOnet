@@ -7,6 +7,7 @@ import os
 import typing
 import datetime
 import itertools
+import tqdm
 
 import tqdm
 import pandas as pd
@@ -341,7 +342,10 @@ class Manager():
 
         result_dict = {}
 
-        for trainer in trainer_list if trainer_list is not None else self.trainer_list:
+        for trainer in tqdm.tqdm(trainer_list if trainer_list is not None else self.trainer_list,
+                                    leave=False,
+                                    desc="Trainers",
+                                    ncols=120):
 
             results = []
             for i_fold in folds:

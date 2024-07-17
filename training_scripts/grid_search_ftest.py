@@ -50,9 +50,14 @@ for i in range(len(dict)):
         paramj, cvj = gcj.get_best()
         spj = np.array(cvj.get(metric))
 
-        _, confidence = static_test.eval(spi, spj, threshold_confidence)
-        confidence_matrix[i,j] = 1 - confidence
-        confidence_matrix[j,i] = 1 - confidence
+        if len(spj) != len(spi) or  len(spj) != 10:
+            confidence_matrix[i,j] = 10
+            confidence_matrix[j,i] = 10
+
+        else:
+            _, confidence = static_test.eval(spi, spj, threshold_confidence)
+            confidence_matrix[i,j] = 1 - confidence
+            confidence_matrix[j,i] = 1 - confidence
 
 keys_str = [f'{feature} {classifier}' for (feature, classifier), _ in dict.items()]
 df_confidence_matrix = pd.DataFrame(confidence_matrix, index=keys_str, columns=keys_str)
