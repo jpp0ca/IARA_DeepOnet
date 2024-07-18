@@ -140,7 +140,7 @@ class GridSearch():
                     [5, 10, 20, 30, 50, None, 2, 8]                           #Max depth
             ],
             iara_default.Classifier.MLP: [
-                [512, 1024, 4096, 16*1024],                             #Batch
+                [512, 1024, 4096, 16*1024, 32, 64],                             #Batch
                 [
                     32,
                     64,
@@ -151,7 +151,11 @@ class GridSearch():
                     2048,
                     [64, 32],
                     [128, 64],
-                    [256, 64]
+                    [256, 64],
+                    16,
+                    8,
+                    4,
+                    [32, 16],
                 ],                                                      #hidden_channels
                 [0, 0.2, 0.4, 0.6],                                     #dropout
                 ['Batch', 'Instance', 'None'],                          #norm_layer
@@ -211,8 +215,8 @@ class GridSearch():
                     self.headers[iara_default.Classifier.FOREST][1]: [0, 1, 2, 3, 4, 5, 6, 7]    #Max depth
                 },
                 iara_default.Classifier.MLP: {
-                    self.headers[iara_default.Classifier.MLP][0]: [0, 1, 2],      #Batch
-                    self.headers[iara_default.Classifier.MLP][1]: [0, 1, 3, 5, 7, 9],#hidden_channels
+                    self.headers[iara_default.Classifier.MLP][0]: [0, 1, 2, 4, 5],      #Batch
+                    self.headers[iara_default.Classifier.MLP][1]: [0, 1, 3, 5, 7, 9, 10, 11, 12, 13],#hidden_channels
                     self.headers[iara_default.Classifier.MLP][2]: [0, 1, 2],      #dropout
                     self.headers[iara_default.Classifier.MLP][3]: [0, 1, 2],      #norm_layer
                     self.headers[iara_default.Classifier.MLP][4]: [0, 1, 2],      #activation_layer
@@ -284,11 +288,11 @@ class GridSearch():
                     self.headers[iara_default.Classifier.FOREST][1]: [0]          #Max depth
                 },
                 iara_default.Classifier.MLP: {
-                    self.headers[iara_default.Classifier.MLP][0]: [2],            #Batch
-                    self.headers[iara_default.Classifier.MLP][1]: [1],            #hidden_channels
+                    self.headers[iara_default.Classifier.MLP][0]: [5],            #Batch
+                    self.headers[iara_default.Classifier.MLP][1]: [2],            #hidden_channels
                     self.headers[iara_default.Classifier.MLP][2]: [2],            #dropout
-                    self.headers[iara_default.Classifier.MLP][3]: [2],            #norm_layer
-                    self.headers[iara_default.Classifier.MLP][4]: [0],            #activation_layer
+                    self.headers[iara_default.Classifier.MLP][3]: [0],            #norm_layer
+                    self.headers[iara_default.Classifier.MLP][4]: [1],            #activation_layer
                     self.headers[iara_default.Classifier.MLP][5]: [0],            #activation_output_layer
                     self.headers[iara_default.Classifier.MLP][6]: [1],            #weight_decay
                     self.headers[iara_default.Classifier.MLP][7]: [1],            #lr
