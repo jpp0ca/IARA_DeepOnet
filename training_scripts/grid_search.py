@@ -71,8 +71,10 @@ class GridSearch():
                     [5, 10, 20, 30, 50, None]                           #Max depth
             ],
             iara_default.Classifier.MLP: [
-                [512, 1024, 4096, 16*1024],                             #Batch
+                [16, 32, 128, 512, 2048],                             #Batch
                 [
+                    8, 
+                    16,
                     32,
                     64,
                     128,
@@ -80,13 +82,13 @@ class GridSearch():
                     512,
                     1024,
                     2048,
+                    [32, 16],
                     [64, 32],
-                    [128, 64],
-                    [256, 64]
+                    [16, 8],
                 ],                                                      #hidden_channels
-                [0, 0.2, 0.4, 0.6, 0.5],                                     #dropout
+                [0, 0.2, 0.4, 0.5, 0.6],                                #dropout
                 ['Batch', 'Instance', 'None'],                          #norm_layer
-                ['ReLU', 'PReLU', 'LeakyReLU'],                         #activation_layer
+                ['Tanh', 'ReLU', 'PReLU', 'LeakyReLU'],                 #activation_layer
                 ['Sigmoid', 'ReLU', 'Linear'],                          #activation_output_layer
                 [1e-2, 1e-3, 1e-5, 0],                                  #weight_decay
                 [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8],                   #lr
@@ -146,15 +148,15 @@ class GridSearch():
                     self.headers[iara_default.Classifier.FOREST][1]: [0, 1, 2, 3, 4, 5] #Max depth
                 },
                 iara_default.Classifier.MLP: {
-                    self.headers[iara_default.Classifier.MLP][0]: [0, 1, 2],      #Batch
-                    self.headers[iara_default.Classifier.MLP][1]: [0, 1, 2, 3, 5, 7, 9],#hidden_channels
-                    self.headers[iara_default.Classifier.MLP][2]: [0, 1, 2, 4, 3],      #dropout
-                    self.headers[iara_default.Classifier.MLP][3]: [0, 1, 2],      #norm_layer
-                    self.headers[iara_default.Classifier.MLP][4]: [0, 1, 2],      #activation_layer
-                    self.headers[iara_default.Classifier.MLP][5]: [0, 1, 2],      #activation_output_layer
-                    self.headers[iara_default.Classifier.MLP][6]: [1, 2, 3],      #weight_decay
-                    self.headers[iara_default.Classifier.MLP][7]: [0, 1, 2],      #lr
-                    self.headers[iara_default.Classifier.MLP][8]: [0, 1, 2],      #loss
+                    self.headers[iara_default.Classifier.MLP][0]: [0, 1, 2],            #Batch
+                    self.headers[iara_default.Classifier.MLP][1]: [1, 2, 3, 9, 10, 11], #hidden_channels
+                    self.headers[iara_default.Classifier.MLP][2]: [0, 1, 2],            #dropout
+                    self.headers[iara_default.Classifier.MLP][3]: [0, 1, 2],            #norm_layer
+                    self.headers[iara_default.Classifier.MLP][4]: [0, 1, 2, 3],         #activation_layer
+                    self.headers[iara_default.Classifier.MLP][5]: [0, 1, 2],            #activation_output_layer
+                    self.headers[iara_default.Classifier.MLP][6]: [0, 1, 2, 3],            #weight_decay
+                    self.headers[iara_default.Classifier.MLP][7]: [0, 1, 2],            #lr
+                    self.headers[iara_default.Classifier.MLP][8]: [0, 1, 2],            #loss
                 },
                 iara_default.Classifier.CNN: {
                     self.headers[iara_default.Classifier.CNN][0]:  [0, 2, 4],     #Batch size
@@ -181,14 +183,14 @@ class GridSearch():
                     self.headers[iara_default.Classifier.FOREST][1]: [0, 1, 2, 3, 4, 5] #Max depth
                 },
                 iara_default.Classifier.MLP: {
-                    self.headers[iara_default.Classifier.MLP][0]: [1, 2, 3],      #Batch
-                    self.headers[iara_default.Classifier.MLP][1]: [1, 3, 4, 5, 6, 9],#hidden_channels
+                    self.headers[iara_default.Classifier.MLP][0]: [0, 1, 2],      #Batch
+                    self.headers[iara_default.Classifier.MLP][1]: [1, 2, 3, 9],#hidden_channels
                     self.headers[iara_default.Classifier.MLP][2]: [0, 1, 2],      #dropout
                     self.headers[iara_default.Classifier.MLP][3]: [0, 1, 2],      #norm_layer
-                    self.headers[iara_default.Classifier.MLP][4]: [0, 1, 2],      #activation_layer
+                    self.headers[iara_default.Classifier.MLP][4]: [0, 1, 2, 3],      #activation_layer
                     self.headers[iara_default.Classifier.MLP][5]: [0, 1, 2],      #activation_output_layer
-                    self.headers[iara_default.Classifier.MLP][6]: [1, 2, 3],      #weight_decay
-                    self.headers[iara_default.Classifier.MLP][7]: [1, 2, 3],      #lr
+                    self.headers[iara_default.Classifier.MLP][6]: [0, 1, 3],      #weight_decay
+                    self.headers[iara_default.Classifier.MLP][7]: [0, 1, 2],      #lr
                     self.headers[iara_default.Classifier.MLP][8]: [0, 1, 2],      #loss
                 },
                 iara_default.Classifier.CNN: {
@@ -219,15 +221,15 @@ class GridSearch():
                     self.headers[iara_default.Classifier.FOREST][1]: [2]          #Max depth
                 },
                 iara_default.Classifier.MLP: {
-                    self.headers[iara_default.Classifier.MLP][0]: [2],            #Batch
-                    self.headers[iara_default.Classifier.MLP][1]: [1],            #hidden_channels
-                    self.headers[iara_default.Classifier.MLP][2]: [2],            #dropout
-                    self.headers[iara_default.Classifier.MLP][3]: [2],            #norm_layer
-                    self.headers[iara_default.Classifier.MLP][4]: [0],            #activation_layer
-                    self.headers[iara_default.Classifier.MLP][5]: [1],            #activation_output_layer
-                    self.headers[iara_default.Classifier.MLP][6]: [2],            #weight_decay
-                    self.headers[iara_default.Classifier.MLP][7]: [0],            #lr
-                    self.headers[iara_default.Classifier.MLP][8]: [2],            #loss
+                    self.headers[iara_default.Classifier.MLP][0]: [1],            #Batch
+                    self.headers[iara_default.Classifier.MLP][1]: [9],            #hidden_channels
+                    self.headers[iara_default.Classifier.MLP][2]: [1],            #dropout
+                    self.headers[iara_default.Classifier.MLP][3]: [0],            #norm_layer
+                    self.headers[iara_default.Classifier.MLP][4]: [1],            #activation_layer
+                    self.headers[iara_default.Classifier.MLP][5]: [0],            #activation_output_layer
+                    self.headers[iara_default.Classifier.MLP][6]: [1],            #weight_decay
+                    self.headers[iara_default.Classifier.MLP][7]: [1],            #lr
+                    self.headers[iara_default.Classifier.MLP][8]: [0],            #loss
                 },
                 iara_default.Classifier.CNN: {
                     self.headers[iara_default.Classifier.CNN][0]:  [0],           #Batch size
@@ -254,19 +256,19 @@ class GridSearch():
                     self.headers[iara_default.Classifier.FOREST][1]: [2]          #Max depth
                 },
                 iara_default.Classifier.MLP: {
-                    self.headers[iara_default.Classifier.MLP][0]: [2],            #Batch
-                    self.headers[iara_default.Classifier.MLP][1]: [3],            #hidden_channels
-                    self.headers[iara_default.Classifier.MLP][2]: [2],            #dropout
-                    self.headers[iara_default.Classifier.MLP][3]: [2],            #norm_layer
-                    self.headers[iara_default.Classifier.MLP][4]: [0],            #activation_layer
+                    self.headers[iara_default.Classifier.MLP][0]: [1],            #Batch
+                    self.headers[iara_default.Classifier.MLP][1]: [1],            #hidden_channels
+                    self.headers[iara_default.Classifier.MLP][2]: [1],            #dropout
+                    self.headers[iara_default.Classifier.MLP][3]: [0],            #norm_layer
+                    self.headers[iara_default.Classifier.MLP][4]: [1],            #activation_layer
                     self.headers[iara_default.Classifier.MLP][5]: [0],            #activation_output_layer
                     self.headers[iara_default.Classifier.MLP][6]: [1],            #weight_decay
                     self.headers[iara_default.Classifier.MLP][7]: [1],            #lr
                     self.headers[iara_default.Classifier.MLP][8]: [0],            #loss
                 },
                 iara_default.Classifier.CNN: {
-                    self.headers[iara_default.Classifier.CNN][0]:  [1],           #Batch size
-                    self.headers[iara_default.Classifier.CNN][1]:  [9],           #conv_n_neurons
+                    self.headers[iara_default.Classifier.CNN][0]:  [0],           #Batch size
+                    self.headers[iara_default.Classifier.CNN][1]:  [6],           #conv_n_neurons
                     self.headers[iara_default.Classifier.CNN][2]:  [0],           #conv_activation
                     self.headers[iara_default.Classifier.CNN][3]:  [1],           #conv_pooling
                     self.headers[iara_default.Classifier.CNN][4]:  [1],           #conv_pooling_size
@@ -394,6 +396,8 @@ class GridSearch():
                         trainer_id = trainer_id,
                         n_targets = config.dataset.target.get_n_targets(),
                         batch_size = self.possible_param[classifier][0][param_pack[0]],
+                        n_epochs = 50,
+                        patience = 8,
                         model_allocator = lambda input_shape, n_targets,
                             hidden_channels = self.possible_param[classifier][1][param_pack[1]],
                             dropout = self.possible_param[classifier][2][param_pack[2]],

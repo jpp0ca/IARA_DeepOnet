@@ -288,8 +288,6 @@ class CrossValidationCompiler():
     def print_cm(self, filename: str = None, relative=True):
         dict_id = 'rel_cm' if relative else 'abs_cm'
 
-        print(self._score_dict[dict_id])
-
         num_folds = len(self._score_dict[dict_id])
         first_matrix = next(iter(self._score_dict[dict_id].values()))
         n_classes = first_matrix.shape[0]
@@ -343,7 +341,7 @@ class CrossValidationCompiler():
         Returns:
             str: Formatted string.
         """
-        decimal_places = int(math.log10(math.sqrt(n_samples))+1)
+        decimal_places = 2#int(math.log10(math.sqrt(n_samples))+1)
         if tex_format:
             return f'${np.mean(values):.{decimal_places}f} \\pm {np.std(values):.{decimal_places}f}$'
 
@@ -530,6 +528,12 @@ class GridCompiler():
     def get_cv(self, params: typing.Dict):
         params_hash = GridCompiler.calc_hash(params)
         return self.cv_dict[params_hash]['cv']
+
+    def get_param_by_index(self, index: int):
+        return self.cv_dict[list(self.param_dict.keys())[index]]['params']
+
+    def get_cv_by_index(self, index: int):
+        return self.cv_dict[list(self.param_dict.keys())[index]]['cv']
 
     def print_best_cm(self, filename: str = None, metric: Metric = Metric.SP_INDEX, relative=True):
         if self.is_empty():
