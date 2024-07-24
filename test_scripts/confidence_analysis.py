@@ -24,7 +24,7 @@ model_id = {
     iara.default.Classifier.MLP: '0[1]_1[9]_2[1]_3[0]_4[1]_5[0]_6[1]_7[1]_8[0]',
     iara.default.Classifier.CNN: '0[0]_1[7]_2[2]_3[1]_4[0]_5[2]_6[0]_7[1]_8[2]_9[2]_10[2]_11[0]_12[0]_13[1]_14[3]_15[0]',
 }
-percent_list = list(np.arange(10, 100, 1))
+percent_list = list(np.arange(25, 100, 1))
 folds = range(10)
 
 grid = iara_metrics.GridCompiler()
@@ -160,3 +160,23 @@ for metric in metric_list:
 
 grid.export(os.path.join(output_dir,'grid.tex'))
 grid.export(os.path.join(output_dir,'grid.csv'))
+
+
+dataframes = []
+for metric in metric_list:
+    for classifier in iara.default.Classifier:
+        x = qtd[classifier]['x']
+        y = np.mean(qtd[classifier]['y'], axis=1)
+        
+        df = pd.DataFrame({'x': x, 'y': y})
+        
+        df['metric'] = metric
+        df['classifier'] = classifier
+        
+        dataframes.append(df)
+
+# Concatenando todos os DataFrames temporários em um único DataFrame
+final_df = pd.concat(dataframes, ignore_index=True)
+
+print(final_df)
+final_df.to_csv(os.path.join(output_dir,'len_grid.csv'))

@@ -179,7 +179,7 @@ class GridSearch():
             },
             Feature.LOFAR: {
                 iara_default.Classifier.FOREST: {
-                    self.headers[iara_default.Classifier.FOREST][0]: [0, 1, 2, 4],   #Estimators
+                    self.headers[iara_default.Classifier.FOREST][0]: [0, 1, 2, 4, 6, 8],   #Estimators
                     self.headers[iara_default.Classifier.FOREST][1]: [0, 1, 2, 3, 4, 5] #Max depth
                 },
                 iara_default.Classifier.MLP: {
@@ -252,13 +252,13 @@ class GridSearch():
             },
             Feature.LOFAR: {
                 iara_default.Classifier.FOREST: {
-                    self.headers[iara_default.Classifier.FOREST][0]: [4],         #Estimators
+                    self.headers[iara_default.Classifier.FOREST][0]: [6],         #Estimators
                     self.headers[iara_default.Classifier.FOREST][1]: [2]          #Max depth
                 },
                 iara_default.Classifier.MLP: {
                     self.headers[iara_default.Classifier.MLP][0]: [1],            #Batch
-                    self.headers[iara_default.Classifier.MLP][1]: [1],            #hidden_channels
-                    self.headers[iara_default.Classifier.MLP][2]: [1],            #dropout
+                    self.headers[iara_default.Classifier.MLP][1]: [9],            #hidden_channels
+                    self.headers[iara_default.Classifier.MLP][2]: [0],            #dropout
                     self.headers[iara_default.Classifier.MLP][3]: [0],            #norm_layer
                     self.headers[iara_default.Classifier.MLP][4]: [1],            #activation_layer
                     self.headers[iara_default.Classifier.MLP][5]: [0],            #activation_output_layer

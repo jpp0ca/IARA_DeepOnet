@@ -166,19 +166,36 @@ class OtherCollections(enum.Enum):
                         max_depth = 5)
 
             elif classifier == iara_default.Classifier.MLP:
-
+                
                 trainer = iara_trn.OptimizerTrainer(
                         training_strategy=training_strategy,
                         trainer_id = 'mlp mel',
-                        n_targets = collection.target.get_n_targets(),
-                        batch_size=1024,
-                        model_allocator=lambda input_shape, n_targets:
-                                iara_mlp.MLP(input_shape=input_shape,
-                                    n_neurons=128,
-                                    n_targets=n_targets,
-                                    activation_hidden_layer=torch.nn.PReLU()),
-                        optimizer_allocator=lambda model:
-                            torch.optim.Adam(model.parameters(), weight_decay=1e-5))
+                        n_targets = config.dataset.target.get_n_targets(),
+                        batch_size = 64,
+                        model_allocator = lambda input_shape, n_targets,
+                            hidden_channels = 128,
+                            dropout = 0.4,
+                            norm_layer = torch.nn.BatchNorm1d,
+                            activation_layer = torch.nn.PReLU,
+                            activation_output_layer = torch.nn.Sigmoid:
+
+                                iara_mlp.MLP(input_shape = input_shape,
+                                    hidden_channels = hidden_channels,
+                                    n_targets = n_targets,
+                                    dropout = dropout,
+                                    norm_layer = norm_layer,
+                                    activation_layer = activation_layer,
+                                    activation_output_layer = activation_output_layer),
+
+                        optimizer_allocator=lambda model,
+                            weight_decay = 1e-3,
+                            lr = 1e-4:
+                                torch.optim.Adam(model.parameters(), weight_decay = weight_decay, lr = lr),
+                        loss_allocator = lambda class_weights:
+                                torch.nn.CrossEntropyLoss(weight=class_weights, reduction='mean')
+                )
+
+
 
             manager_dict[classifier] = iara_exp.Manager(config, trainer)
 
@@ -192,7 +209,7 @@ def main(
          override: bool):
 
 
-    classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.CNN]
+    classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.MLP, iara_default.Classifier.CNN]
     # classifiers = [iara_default.Classifier.FOREST]
     eval_subsets = [iara_trn.Subset.TEST, iara_trn.Subset.ALL]
 
