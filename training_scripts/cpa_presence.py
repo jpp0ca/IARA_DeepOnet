@@ -14,7 +14,9 @@ This script generates two tests:
 import typing
 import itertools
 import argparse
+import os
 
+import pandas as pd
 import torch
 
 import iara.records
@@ -53,8 +55,8 @@ def main(override: bool,
 
     output_base_dir = f"{DEFAULT_DIRECTORIES.training_dir}/{exp_str}/exp_{cpa_test}"
 
-    # classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.MLP, iara_default.Classifier.CNN]
-    classifiers = [iara_default.Classifier.FOREST]
+    classifiers = [iara_default.Classifier.FOREST, iara_default.Classifier.MLP, iara_default.Classifier.CNN]
+    # classifiers = [iara_default.Classifier.MLP]
 
     manager_dict_0 = iara_default.default_mel_managers(
                 config_name = f'{str(collections[0])}',
@@ -82,10 +84,16 @@ def main(override: bool,
 
     comparison_dir = f'{output_base_dir}/comparison'
 
+    first_grid = iara_metrics.GridCompiler()
+    second_grid = iara_metrics.GridCompiler()
+
     for classifier in classifiers:
-        # strategy = iara_trn.EvalStrategy.BY_WINDOW
-        for strategy in iara_trn.EvalStrategy:
-            for subset in [iara_trn.Subset.TEST, iara_trn.Subset.ALL]:
+        for strategy in [iara_trn.EvalStrategy.BY_AUDIO]:
+        # for strategy in iara_trn.EvalStrategy:
+
+            for subset in [iara_trn.Subset.TEST]:
+            # for subset in [iara_trn.Subset.TEST, iara_trn.Subset.ALL]:
+
                 comparator = iara_exp.CrossComparator(comparator_eval_dir = comparison_dir,
                                                     manager_a = manager_dict_0[classifier],
                                                     manager_b = manager_dict_1[classifier])
@@ -97,6 +105,37 @@ def main(override: bool,
 
                 print(f'########## {subset}, {strategy} ##########')
                 print(result_grid[subset, strategy])
+
+                first_grid.add_cv(result_grid[subset, strategy].get_param_by_index(0), result_grid[subset, strategy].get_cv_by_index(0))
+                first_grid.add_cv(result_grid[subset, strategy].get_param_by_index(3), result_grid[subset, strategy].get_cv_by_index(3))
+                
+                second_grid.add_cv(result_grid[subset, strategy].get_param_by_index(1), result_grid[subset, strategy].get_cv_by_index(1))
+                second_grid.add_cv(result_grid[subset, strategy].get_param_by_index(2), result_grid[subset, strategy].get_cv_by_index(2))
+
+    # first_grid.export(os.path.join(output_base_dir, 'first.tex'))
+    # second_grid.export(os.path.join(output_base_dir, 'second.tex'))
+
+
+    first_grid = first_grid.to_df()
+    second_grid = second_grid.to_df()
+
+    print('########## first grid ##########')
+    print(first_grid)
+    print('########## second grid ##########')
+    print(second_grid)
+
+    first_grid = first_grid.rename(columns={"SP": f'SP {str(collections[0])}', "ACC": f'ACC {str(collections[0])}'})
+    second_grid = second_grid.rename(columns={"SP": f'SP {str(collections[1])}', "ACC": f'ACC {str(collections[1])}'})
+
+    # Realizando o merge com base nas colunas Trainer e Trained
+    merged_df = pd.merge(first_grid[['Trainer', 'Trained', f'SP {str(collections[0])}', f'ACC {str(collections[0])}']],
+                        second_grid[['Trainer', 'Trained', f'SP {str(collections[1])}', f'ACC {str(collections[1])}']],
+                        on=['Trainer', 'Trained'], how='inner')
+
+    # Exibindo o resultado
+    print('########## final grid ##########')
+    print(merged_df)
+    merged_df.to_latex(os.path.join(output_base_dir, 'cpa_proximity.tex' if cpa_test == 1 else 'cpa_presence.tex'), index=False)
 
 
 if __name__ == "__main__":

@@ -121,14 +121,14 @@ class OtherCollections(enum.Enum):
                             conv_activation = torch.nn.PReLU,
                             conv_pooling = torch.nn.MaxPool2d,
                             conv_pooling_size = [2,2],
-                            conv_dropout = 0.2,
+                            conv_dropout = 0,
                             batch_norm = torch.nn.BatchNorm2d,
                             kernel_size = 7,
 
                             classification_n_neurons = [64, 32],
                             classification_dropout = 0,
                             classification_norm = None,
-                            classification_hidden_activation = torch.nn.ReLU,
+                            classification_hidden_activation = torch.nn.PReLU,
                             classification_output_activation = torch.nn.Sigmoid:
 
                                 iara_cnn.CNN(
@@ -151,7 +151,7 @@ class OtherCollections(enum.Enum):
                                 ),
                         optimizer_allocator=lambda model,
                             weight_decay = 1e-3,
-                            lr = 1e-5:
+                            lr = 1e-4:
                                 torch.optim.Adam(model.parameters(), weight_decay = weight_decay, lr = lr),
                         loss_allocator = lambda class_weights:
                                 torch.nn.CrossEntropyLoss(weight=class_weights, reduction='mean')
@@ -172,6 +172,8 @@ class OtherCollections(enum.Enum):
                         trainer_id = 'mlp mel',
                         n_targets = config.dataset.target.get_n_targets(),
                         batch_size = 64,
+                        n_epochs = 100,
+                        patience = 8,
                         model_allocator = lambda input_shape, n_targets,
                             hidden_channels = 128,
                             dropout = 0.4,

@@ -217,8 +217,8 @@ class GridSearch():
         self.small_grid = {
             Feature.MEL: {
                 iara_default.Classifier.FOREST: {
-                    self.headers[iara_default.Classifier.FOREST][0]: [2],         #Estimators
-                    self.headers[iara_default.Classifier.FOREST][1]: [2]          #Max depth
+                    self.headers[iara_default.Classifier.FOREST][0]: [1],         #Estimators
+                    self.headers[iara_default.Classifier.FOREST][1]: [3]          #Max depth
                 },
                 iara_default.Classifier.MLP: {
                     self.headers[iara_default.Classifier.MLP][0]: [1],            #Batch
@@ -232,22 +232,22 @@ class GridSearch():
                     self.headers[iara_default.Classifier.MLP][8]: [0],            #loss
                 },
                 iara_default.Classifier.CNN: {
-                    self.headers[iara_default.Classifier.CNN][0]:  [0],           #Batch size
-                    self.headers[iara_default.Classifier.CNN][1]:  [7],           #conv_n_neurons
-                    self.headers[iara_default.Classifier.CNN][2]:  [2],           #conv_activation
-                    self.headers[iara_default.Classifier.CNN][3]:  [1],           #conv_pooling
-                    self.headers[iara_default.Classifier.CNN][4]:  [0],           #conv_pooling_size
-                    self.headers[iara_default.Classifier.CNN][5]:  [2],           #conv_dropout
-                    self.headers[iara_default.Classifier.CNN][6]:  [0],           #batch_norm
-                    self.headers[iara_default.Classifier.CNN][7]:  [1],           #kernel_size
-                    self.headers[iara_default.Classifier.CNN][8]:  [2],           #classification_n_neurons
-                    self.headers[iara_default.Classifier.CNN][9]:  [2],           #classification_dropout
-                    self.headers[iara_default.Classifier.CNN][10]: [2],           #classification_norm
-                    self.headers[iara_default.Classifier.CNN][11]: [0],           #classification_hidden_activation
-                    self.headers[iara_default.Classifier.CNN][12]: [0],           #classification_output_activation
-                    self.headers[iara_default.Classifier.CNN][13]: [1],           #weight_decay
-                    self.headers[iara_default.Classifier.CNN][14]: [3],           #lr
-                    self.headers[iara_default.Classifier.CNN][15]: [0],           #loss
+                    self.headers[iara_default.Classifier.CNN][0]:  [0  0],           #Batch size
+                    self.headers[iara_default.Classifier.CNN][1]:  [7  6],           #conv_n_neurons
+                    self.headers[iara_default.Classifier.CNN][2]:  [2  0],           #conv_activation
+                    self.headers[iara_default.Classifier.CNN][3]:  [1  1],           #conv_pooling
+                    self.headers[iara_default.Classifier.CNN][4]:  [0  1],           #conv_pooling_size
+                    self.headers[iara_default.Classifier.CNN][5]:  [2  2],           #conv_dropout
+                    self.headers[iara_default.Classifier.CNN][6]:  [0  0],           #batch_norm
+                    self.headers[iara_default.Classifier.CNN][7]:  [1  1],           #kernel_size
+                    self.headers[iara_default.Classifier.CNN][8]:  [2  2],           #classification_n_neurons
+                    self.headers[iara_default.Classifier.CNN][9]:  [2  2],           #classification_dropout
+                    self.headers[iara_default.Classifier.CNN][10]: [2  2],           #classification_norm
+                    self.headers[iara_default.Classifier.CNN][11]: [0  0],           #classification_hidden_activation
+                    self.headers[iara_default.Classifier.CNN][12]: [0  0],           #classification_output_activation
+                    self.headers[iara_default.Classifier.CNN][13]: [1  1],           #weight_decay
+                    self.headers[iara_default.Classifier.CNN][14]: [3  3],           #lr
+                    self.headers[iara_default.Classifier.CNN][15]: [0  0],           #loss
                 }
             },
             Feature.LOFAR: {
