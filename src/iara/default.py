@@ -30,9 +30,11 @@ class Directories:
         self.tables_dir = tables_dir
 
 
-DEFAULT_DIRECTORIES = Directories()
+DEFAULT_DIRECTORIES = Directories(data_dir="/home/joao.poca/Documents/IARA/shipsear_16e3")
 DEFAULT_DEEPSHIP_DIRECTORIES = Directories(data_dir="/data/deepship",
                                            process_dir="./data/deepship_processed")
+
+DEFAULT_SSH_DIRECTORIES = Directories(data_dir="/mnt/sonar_data/data/iara")
 
 class Target(enum.Enum):
     # https://www.mdpi.com/2072-4292/11/3/353

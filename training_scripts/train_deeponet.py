@@ -22,12 +22,15 @@ def main(folds: typing.List[int], override: bool, only_sample: bool):
     
     # A DeepONet com uma Branch Net CNN requer uma entrada em formato de imagem
     input_type = iara_default.default_image_input()
+    print(f"--- Usando o tipo de entrada: {input_type} ---")
 
     # Use o processador de dados padrão para espectrogramas MEL
     data_processor = iara_default.default_iara_mel_audio_processor()
+    print(f"--- Usando o processador de dados: {data_processor} ---")
 
     # Use a coleção de dados padrão (OS - Oceanic-Shallow)
     collection = iara_default.default_collection(only_sample=only_sample)
+    print(f"--- Usando a coleção de dados: {collection} ---")
 
     # Configuração do experimento
     config = iara_exp.Config(
@@ -37,6 +40,7 @@ def main(folds: typing.List[int], override: bool, only_sample: bool):
             output_base_dir=output_base_dir,
             input_type=input_type
     )
+    print(f"--- Configuração do experimento: {config} ---")
 
     # --- 2. Alocador de Modelo (Model Allocator) ---
     # Esta função será chamada pelo Trainer para criar o modelo para cada fold.

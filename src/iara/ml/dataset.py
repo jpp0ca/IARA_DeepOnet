@@ -108,7 +108,7 @@ class ExperimentDataLoader():
             return
 
         data_df = self.__get(file_id)
-
+        print('-----------',data_df)
         memory = data_df.memory_usage(deep=True).sum()
 
         if self.total_memory < ExperimentDataLoader.MEMORY_LIMIT and \

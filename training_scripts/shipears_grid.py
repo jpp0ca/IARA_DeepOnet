@@ -55,7 +55,7 @@ class ShipsEarCollections():
                              output_base_dir: str,
                              classifier: iara_default.Classifier):
 
-        data_base_dir = "./data/shipsear_16e3"
+        data_base_dir = "/home/joao.poca/Documents/IARA/shipsear_16e3"
         data_processed_base_dir = "./data/shipsear_processed"
 
         collection = iara.records.CustomCollection(

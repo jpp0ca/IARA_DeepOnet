@@ -164,13 +164,17 @@ if __name__ == "__main__":
     if args.training_strategy is not None:
         index = strategy_choises.index(args.training_strategy)
         strategies.append(iara_trn.ModelTrainingStrategy(index))
+        print(f'Using strategy: {strategies}')
     else:
         strategies = iara_trn.ModelTrainingStrategy
+        print('strat choices:', strategy_choises)
+        print(f'Using all strategies: {strategies}')
 
     for n_test in test_choices if args.cpa_test is None else [args.cpa_test]:
 
         for strategy in strategies:
-
+            print(f'Running strategy: {strategy}')
+            print('----------args training strat:', args.training_strategy)
             index = strategy_choises.index(args.training_strategy)
             main(override = args.override,
                 folds = folds_to_execute,
